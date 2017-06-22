@@ -90,14 +90,45 @@ def project(vertex, triangle):
         return local, proj
 
 
-def behind(vertex, triangle):
+def vertex_behind(vertex, triangle):
     vertex = np.asarray(vertex)
     local, proj = project(vertex, triangle)
     x = local[..., 0]
     y = local[..., 1]
     orig_z = vertex[..., 2]
     z = proj[..., 2]
-    return (0 <= x) & (x <= 1) & (0 <= y) & (y <= 1) & (0 <= x + y) & (x + y <= 1) & (orig_z < z)
+    return ((0 <= x) & (x <= 1) & (0 <= y) & (y <= 1) &
+            (0 <= x + y) & (x + y <= 1) & (orig_z < z))
+
+
+def triangle_behind(query_triangle, triangle):
+    query_triangle = np.asarray(query_triangle)
+    local, proj = project(query_triangle, triangle)
+    x = local[..., 0]
+    y = local[..., 1]
+    orig_z = query_triangle[..., 2]
+    z = proj[..., 2]
+    v = np.any((0 <= x) & (x <= 1) & (0 <= y) & (y <= 1) &
+               (0 <= x + y) & (x + y <= 1) & (orig_z < z))
+    if v:
+        print("Node behind")
+        return v
+    for edge in range(3):
+        p1 = local[edge]
+        p2 = local[(edge+1)%3]
+        for dim in range(2):
+            if p1[dim] * p2[dim] < 0:
+                ratio = -p1[1-dim] * (p2[1-dim] - p1[1-dim])
+                intersection = p1[dim] + ratio * (p2[dim] - p1[dim])
+                if 0 <= intersection <= 1:
+                    # Edges intersect
+                    z_base = triangle[0, 2]
+                    z_ext = triangle[1+dim, 2]
+                    z_at_intersection = z_base + (z_ext - z_base) * intersection
+                    z_on_edge = p1[2] + ratio * (p2[2] - p1[2])
+                    if z_on_edge < z_at_intersection:
+                        print("Edge behind")
+                        return True
 
 
 def z_order(faces):
@@ -131,8 +162,8 @@ def z_order(faces):
     before = {}
 
     for i1, i2 in zip(i1s, i2s):
-        b = (np.any(behind(face_shrink[i1], faces[i2])) or
-             not np.any(behind(face_shrink[i2], faces[i1])))
+        b = (np.any(triangle_behind(face_shrink[i1], faces[i2])) or
+             not np.any(triangle_behind(face_shrink[i2], faces[i1])))
         if b:
             i2, i1 = i1, i2
         before.setdefault(i1, []).append(i2)
