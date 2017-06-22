@@ -9,7 +9,7 @@ APP_NAME = 'terrender'
 
 
 class Terrain:
-    def __init__(self, n=5, seed=1):
+    def __init__(self, n=10, seed=2):
         rng = np.random.RandomState(seed)
         corners = np.array([
             [-2, -3],
@@ -18,6 +18,7 @@ class Terrain:
         ])
         # Take uniform random xy-coordinates in [-0.5, 0.5)
         vertex_xy = rng.rand(n, 2) - 0.5
+        print(vertex_xy)
         points = np.concatenate((corners, vertex_xy))
         self.tri = scipy.spatial.Delaunay(points)
         corners = sorted(np.ravel(self.tri.convex_hull).tolist())
@@ -63,35 +64,40 @@ def rot_4d_yz(angle):
 
 def project(vertex, triangle):
     vertex = np.asarray(vertex)
+    if vertex.ndim < 2:
+        onedim = True
+        vertex = vertex.reshape(1, -1)
+    else:
+        onedim = False
+        assert vertex.ndim == 2
     triangle = np.asarray(triangle)
     assert triangle.shape[0] == 3
     assert triangle.shape[1] in (3, 4)
-    assert vertex.shape == (triangle.shape[1],)
+    assert vertex.shape[-1] == triangle.shape[1]
     b, c = triangle[1:3] - triangle[0]
-    v = vertex - triangle[0]
+    v = vertex - triangle[0:1]
 
     local = (np.linalg.inv(np.transpose([b[:2], c[:2]])) @
-             v[:2, np.newaxis])
-    assert local.shape == (2, 1), local.shape
+             v.T[:2]).T
+    assert local.shape == (len(v), 2), local.shape
     proj = (triangle[0:1].T +
             np.transpose([b, c]) @
-            local)
-    assert proj.shape == (triangle.shape[1], 1), proj.shape
-    return local[:, 0], proj[:, 0]
+            local.T).T
+    assert proj.shape == (len(v), triangle.shape[1]), proj.shape
+    if onedim:
+        return local[0], proj[0]
+    else:
+        return local, proj
 
 
 def behind(vertex, triangle):
-    locals, projs = zip(*[project(vertex, t)
-                          for t in itertools.permutations(triangle)])
-    assert np.allclose(projs, np.roll(projs, 1, 0))
-    proj = projs[0]
-    local = locals[0]
-    x, y = local
-    z = proj[2]
-    # print("Projected %s by %s, local %s" % (vertex[:3], np.array(proj[:3]) - vertex[:3], local))
-    if 0 <= x <= 1 and 0 <= y <= 1 and 0 <= x + y <= 1 and vertex[2] < z:
-        # print('(%g, %g, %g) is behind\n%s' % (*vertex[:3], triangle))
-        return True
+    vertex = np.asarray(vertex)
+    local, proj = project(vertex, triangle)
+    x = local[..., 0]
+    y = local[..., 1]
+    orig_z = vertex[..., 2]
+    z = proj[..., 2]
+    return (0 <= x) & (x <= 1) & (0 <= y) & (y <= 1) & (0 <= x + y) & (x + y <= 1) & (orig_z < z)
 
 
 def z_order(faces):
@@ -107,8 +113,6 @@ def z_order(faces):
 
     f_min = np.min(faces, axis=1)
     f_max = np.max(faces, axis=1)
-    # print(f_min)
-    # print(f_max)
 
     # Check for each dimension if a.min <= b.max & b.min <= a.max
     b_overlap = f_min.reshape(-1, 1, d) <= f_max.reshape(1, -1, d)
@@ -119,7 +123,6 @@ def z_order(faces):
 
     # Require overlap in all dimensions
     b_overlap = np.all(b_overlap, axis=2)
-    # print(b_overlap)
     i1s, i2s = b_overlap.nonzero()
     # Since both (i1, i2) and (i2, i1) overlap, only keep (i < j)-pairs
     dup = i1s < i2s
@@ -128,26 +131,28 @@ def z_order(faces):
     before = {}
 
     for i1, i2 in zip(i1s, i2s):
-        b = (any(behind(v, faces[i2]) for v in face_shrink[i1]) or
-             not any(behind(v, faces[i1]) for v in face_shrink[i2]))
+        b = (np.any(behind(face_shrink[i1], faces[i2])) or
+             not np.any(behind(face_shrink[i2], faces[i1])))
         if b:
             i2, i1 = i1, i2
         before.setdefault(i1, []).append(i2)
 
-    # print(before)
+    print(before)
 
-    done = np.zeros(n, bool)
+    state = np.zeros(n)
     output = []
     stack = list(range(n))
     while stack:
         try:
             stack.extend(before.pop(stack[-1]))
         except KeyError:
-            if not done[stack[-1]]:
+            if state[stack[-1]] == 1:
+                raise AssertionError("Cycle")
+            elif state[stack[-1]] == 0:
                 output.append(stack[-1])
-                done[stack[-1]] = True
+                state[stack[-1]] = 2
             stack.pop()
-    assert np.all(done)
+    assert np.all(state == 2)
     # print(output)
     return np.array(output, np.intp)
 
@@ -191,11 +196,11 @@ def output_faces(write, faces):
             write('%.15f %.15f %s' % (p[0], p[1], command))
         write('h')
         write('</path>')
-        for i, p in enumerate(face):
-            write_label(write, p[0], p[1], '%.0f' % (500 + 1000 * p[2]))
-        centroid = np.mean(face, axis=0)
-        write_label(write, centroid[0], centroid[1],
-                    '%.0f' % (500 + 1000 * centroid[2]))
+        # for i, p in enumerate(face):
+        #     write_label(write, p[0], p[1], '%.0f' % (500 + 1000 * p[2]))
+        # centroid = np.mean(face, axis=0)
+        # write_label(write, centroid[0], centroid[1],
+        #             '%.0f' % (500 + 1000 * centroid[2]))
 
 
 @contextlib.contextmanager
@@ -230,7 +235,7 @@ def main():
     with open_writer('top-rot.ipe') as write:
         output_faces(write, project_ortho(t, 0.1, 0))
     with open_multipage_writer('side-ortho.ipe') as open_page:
-        n = 20
+        n = 50
         for i in range(n+1):
             with open_page() as write:
                 output_faces(write, project_ortho(t, 0, 2*np.pi*i/n))
