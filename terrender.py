@@ -9,7 +9,7 @@ APP_NAME = 'terrender'
 
 
 class Terrain:
-    def __init__(self, n=10, seed=2):
+    def __init__(self, n=5, seed=2):
         rng = np.random.RandomState(seed)
         corners = np.array([
             [-2, -3],
@@ -115,7 +115,9 @@ def triangle_behind(query_triangle, triangle):
         return v
     for edge in range(3):
         p1 = local[edge]
+        z1 = query_triangle[edge, 2]
         p2 = local[(edge+1)%3]
+        z2 = query_triangle[(edge+1)%3, 2]
         for dim in range(2):
             if p1[dim] * p2[dim] < 0:
                 ratio = -p1[1-dim] * (p2[1-dim] - p1[1-dim])
@@ -125,7 +127,7 @@ def triangle_behind(query_triangle, triangle):
                     z_base = triangle[0, 2]
                     z_ext = triangle[1+dim, 2]
                     z_at_intersection = z_base + (z_ext - z_base) * intersection
-                    z_on_edge = p1[2] + ratio * (p2[2] - p1[2])
+                    z_on_edge = z1 + ratio * (z2 - z1)
                     if z_on_edge < z_at_intersection:
                         print("Edge behind")
                         return True
@@ -162,9 +164,14 @@ def z_order(faces):
     before = {}
 
     for i1, i2 in zip(i1s, i2s):
-        b = (np.any(triangle_behind(face_shrink[i1], faces[i2])) or
-             not np.any(triangle_behind(face_shrink[i2], faces[i1])))
-        if b:
+        b1 = triangle_behind(faces[i1], faces[i2])
+        b2 = triangle_behind(faces[i2], faces[i1])
+        if b1 and b2:
+            print(i1, i2)
+            raise AssertionError("2-cycle")
+        if not b1 and not b2:
+            continue
+        if b1 or not b2:
             i2, i1 = i1, i2
         before.setdefault(i1, []).append(i2)
 
@@ -175,16 +182,21 @@ def z_order(faces):
     stack = list(range(n))
     while stack:
         try:
-            stack.extend(before.pop(stack[-1]))
-        except KeyError:
-            if state[stack[-1]] == 1:
+            before_tos = before.pop(stack[-1])
+            if np.any(state[before_tos] == 1):
+                print(stack)
+                print(state)
+                print(before_tos)
                 raise AssertionError("Cycle")
-            elif state[stack[-1]] == 0:
+            stack.extend(before_tos)
+            state[stack[-1]] = 1
+        except KeyError:
+            if state[stack[-1]] != 2:
                 output.append(stack[-1])
                 state[stack[-1]] = 2
             stack.pop()
     assert np.all(state == 2)
-    # print(output)
+    print(output)
     return np.array(output, np.intp)
 
 
@@ -198,7 +210,6 @@ def project_ortho(t: Terrain, circumference_angle, altitude_angle):
         points.T).T
     points /= points[:, 3:4]  # Normalize
     faces = points.reshape(-1, 3, 4)
-    faces = faces[z_order(faces)]
     return faces
 
 
@@ -219,8 +230,10 @@ def write_label(write, x, y, l):
 
 
 def output_faces(write, faces):
-    for face in faces:
-        write('<path stroke="0" fill="1">')
+    order = z_order(faces)
+    for i in order:
+        face = faces[i]
+        write('<path stroke="0" fill="%s">' % (1 - min(i/4, 1) * .3))
         assert len(face) == 3, len(face)
         for i, p in enumerate(face):
             command = 'm' if i == 0 else 'l'
@@ -236,20 +249,27 @@ def output_faces(write, faces):
 
 @contextlib.contextmanager
 def page_writer(fp):
+    print("Render a page")
     write = functools.partial(print, file=fp)
     write('<page>')
     write('<group matrix="256 0 0 256 288 688">')
-    yield write
-    write('</group>')
-    write('</page>')
+    try:
+        yield write
+    finally:
+        write('</group>')
+        write('</page>')
 
 
 @contextlib.contextmanager
 def open_multipage_writer(filename):
+    print("Render", filename)
     with open(filename, 'w') as fp:
         print('<ipe version="70000" creator="%s">' % APP_NAME, file=fp)
-        yield functools.partial(page_writer, fp)
-        print('</ipe>', file=fp)
+        try:
+            yield functools.partial(page_writer, fp)
+        finally:
+            print('</ipe>', file=fp)
+    print("Done with", filename)
 
 
 @contextlib.contextmanager
@@ -267,7 +287,7 @@ def main():
         output_faces(write, project_ortho(t, 0.1, 0))
     with open_multipage_writer('side-ortho.ipe') as open_page:
         n = 50
-        for i in range(n+1):
+        for i in range(n):
             with open_page() as write:
                 output_faces(write, project_ortho(t, 0, 2*np.pi*i/n))
 
