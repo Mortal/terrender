@@ -3,6 +3,7 @@ import numpy as np
 import functools
 import itertools
 import contextlib
+import enum
 
 
 APP_NAME = 'terrender'
@@ -88,6 +89,103 @@ def project(vertex, triangle):
         return local[0], proj[0]
     else:
         return local, proj
+
+
+class SpaceOrder(enum.Enum):
+    above = 1
+    below = 2
+    disjoint = 3
+    through = 4
+    coplanar = 5
+
+
+def order_from_sign(sign):
+    return SpaceOrder.above if sign > 0 else SpaceOrder.below
+
+
+def in_unit_triangle(x, y):
+    x, y = np.asarray(x), np.asarray(y)
+    return ((0 <= x) & (x <= 1) & (0 <= y) & (y <= 1) &
+            (0 <= x + y) & (x + y <= 1))
+
+
+def single_segment_triangle(seg, tri) -> SpaceOrder:
+    '''
+    Decide if the segment uv intersects triangle abc.
+
+    >>> ang = np.linspace(0, 2*np.pi, 9, endpoint=False)
+    >>> cos, sin, zero, one = np.cos(ang), np.sin(ang), np.zeros(9), np.ones(9)
+    >>> from numpy import transpose as T
+    >>> a, b, c, d, e, f, g, h, i = T((cos, sin, zero, one))
+    >>> j, k, l, m, n, o, p, q, r = T((cos, sin, sin, one))
+
+    >>> print(single_segment_triangle(T([a, d]), T([f, g, i])))
+    SpaceOrder.coplanar
+    >>> print(single_segment_triangle(T([p, q]), T([f, g, i])))
+    SpaceOrder.below
+    >>> print(single_segment_triangle(T([k, l]), T([a, c, d])))
+    SpaceOrder.above
+    >>> print(single_segment_triangle(T([a, b]), T([a, b, c])))
+    SpaceOrder.coplanar
+    >>> print(single_segment_triangle(T([a, b]), T([l, b, a])))
+    SpaceOrder.coplanar
+    >>> print(single_segment_triangle(T([a, b]), T([l, k, a])))
+    SpaceOrder.below
+    >>> print(single_segment_triangle(T([r, l]), T([b, d, e])))
+    SpaceOrder.above
+    '''
+    seg = np.asarray(seg)
+    tri = np.asarray(tri)
+    assert seg.shape == (4, 2)  # Homogenous 3D segment
+    assert tri.shape == (4, 3)  # Homogenous 3D triangle
+    assert np.allclose(seg[3], 1)  # Normalized
+    assert np.allclose(tri[3], 1)  # Normalized
+    a, b, c = tri.T
+    d = np.append(np.cross(b[:3] - a[:3], c[:3] - a[:3]), 0)
+    # Maps (1,0,0,1) to (b-a) + a
+    # Maps (0,1,0,1) to (c-a) + a
+    # Maps (0,0,1,1) to d + a
+    tri_to_world = np.transpose([b-a, c-a, d, a])
+    world_to_tri = np.linalg.inv(tri_to_world)
+    seg_on_tri = world_to_tri @ seg
+    assert seg_on_tri.shape == (4, 2), seg_on_tri.shape
+    if np.allclose(seg_on_tri[2], 0):
+        return SpaceOrder.coplanar
+    # Compute e[n] such that u+e[n](v-u) intersects xn-plane,
+    # i.e. (u + e[n] (v-u))[n] = 0,
+    # i.e. u[n] + e[n] (v[n]-u[n]) = 0,
+    # i.e. e[n] = -u[n] / (v[n]-u[n])
+    u, v = seg_on_tri.T
+    denom = v[:3] - u[:3]
+    zero = np.isclose(denom, 0)
+    denom[zero] = 1
+    e = -u[:3] / denom
+    if 0 < e[2] < 1 and not zero[2]:
+        # Segment intersects z=0 plane
+        # Compute intersection point with z=0 plane
+        iz = u + e[2] * (v - u)
+        # Decide if intersection point is inside triangle
+        if in_unit_triangle(*iz[:2]):
+            return SpaceOrder.through
+        # Decide if either endpoint is in triangle
+        if in_unit_triangle(*u[:2]):
+            return order_from_sign(u[2])
+        elif in_unit_triangle(*v[:2]):
+            return order_from_sign(v[2])
+        # Check intersection points with x-plane and y-plane
+        ix = u + e[0] * (v - u)
+        if 0 <= ix[0] <= 1 and not zero[0]:
+            return order_from_sign(ix[2])
+        iy = u + e[1] * (v - u)
+        if 0 <= iy[0] <= 1 and not zero[1]:
+            return order_from_sign(iy[2])
+        return SpaceOrder.disjoint
+    else:
+        # Segment is on one side of z=0 plane -
+        # just check z coordinate of either endpoint
+        return order_from_sign((seg_on_tri[2, 0] + seg_on_tri[2, 1]) * d[2])
+    print(seg_on_tri)
+
 
 
 def vertex_behind(vertex, triangle):
