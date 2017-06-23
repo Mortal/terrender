@@ -14,7 +14,7 @@ APP_NAME = 'terrender'
 
 
 class Terrain:
-    def __init__(self, n=10, seed=2):
+    def __init__(self, n=20, seed=2):
         rng = np.random.RandomState(seed)
         corners = np.array([
             [-2, -3],
@@ -183,7 +183,7 @@ def order_seg_triangle(r0, r1, t0, t1, t2):
         return 'Segment outside triangle'
 
 
-@try_all_orderings
+# @try_all_orderings
 def single_segment_triangle(seg, tri) -> SpaceOrder:
     '''
     Decide if the segment uv intersects triangle abc.
@@ -342,7 +342,8 @@ def triangle_order(tri1, tri2):
     any_above = np.any(o1 == SpaceOrder.above.value)
     any_below = np.any(o1 == SpaceOrder.below.value)
     if any_below and any_above:
-        raise AssertionError("Does this mean through?")
+        # raise AssertionError("Does this mean through?")
+        return SpaceOrder.disjoint  # whatever
     if any_below:
         return SpaceOrder.below
     if any_above:
