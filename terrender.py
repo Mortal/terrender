@@ -4,6 +4,10 @@ import functools
 import itertools
 import contextlib
 import enum
+import functools
+
+
+EPS = 1e-9
 
 
 APP_NAME = 'terrender'
@@ -98,32 +102,104 @@ class SpaceOrder(enum.Enum):
     through = 4
     coplanar = 5
 
+    def flip(self):
+        return (SpaceOrder.above if self == SpaceOrder.below else
+                SpaceOrder.below if self == SpaceOrder.above else self)
 
-def order_from_sign(sign):
-    return SpaceOrder.above if sign > 0 else SpaceOrder.below
+    @classmethod
+    def from_sign(cls, sign):
+        return cls.above if sign > 0 else cls.below
 
 
 def in_unit_triangle(x, y):
     x, y = np.asarray(x), np.asarray(y)
-    return ((0 <= x) & (x <= 1) & (0 <= y) & (y <= 1) &
-            (0 <= x + y) & (x + y <= 1))
+    return ((EPS <= x) & (x <= 1-EPS) & (EPS <= y) & (y <= 1-EPS) &
+            (EPS <= x + y) & (x + y <= 1-EPS))
 
 
+def try_all_orderings(fn):
+    @functools.wraps(fn)
+    def wrapper(seg, tri):
+        seg = np.asarray(seg)
+        assert seg.shape == (4, 2), seg.shape  # Homogenous 3D segment
+        tri = np.asarray(tri)
+        r1 = fn(seg, tri)
+        r2 = fn(seg, np.roll(tri, 1, 1))
+        r3 = fn(seg, np.roll(tri, 2, 1))
+        if r1 == r2 == r3 == SpaceOrder.disjoint:
+            return r1
+        r0 = next(r for r in (r1, r2, r3) if r != SpaceOrder.disjoint)
+        if not all(r in (r0, SpaceOrder.disjoint) for r in (r1, r2, r3)):
+            for x in (seg, tri):
+                print('T([%s])' % ', '.join('[%s]' % ', '.join(map(repr, row))
+                                            for row in x.T.tolist()))
+            print(r1, r2, r3)
+            print(
+                'Rolling the triangle gave different results!')
+        return r1
+
+    return wrapper
+
+
+def order_seg_triangle(r0, r1, t0, t1, t2):
+    # Based on http://geomalgorithms.com/a06-_intersect-2.html
+    r0, r1 = np.asarray(r0), np.asarray(r1)
+    t0, t1, t2 = np.asarray(t0), np.asarray(t1), np.asarray(t2)
+    assert r0.shape == r1.shape == t0.shape == t1.shape == t2.shape == (3,)
+    u = t1 - t0
+    v = t2 - t0
+    n = np.cross(u, v)
+    if np.allclose(n, 0):
+        raise ValueError('degenerate triangle')
+    d = r1 - r0
+    w0 = r0 - t0
+    a = -(n @ w0)
+    b = n @ d
+    if np.isclose(b, 0):
+        # Segment is parallel to triangle plane
+        if np.isclose(a, 0):
+            return 'Segment lies in plane'
+        # a < 0 => r0-t0 in direction of normal
+        return SpaceOrder.from_sign(-a*n[2])
+    r = a / b
+    if r < 0:
+        return 'Segment is strictly to one side of triangle plane'
+    if r > 1:
+        return 'Segment is strictly to one side of triangle plane'
+    i = r0 + r * d
+    # Is i inside triangle?
+    uu = u@u
+    uv = u@v
+    vv = v@v
+    w = i - t0
+    wu = w@u
+    wv = w@v
+    denom = uv * uv - uu * vv
+    s = (uv * wv - vv * wu) / denom
+    t = (uv * wu - uu * wv) / denom
+    if in_unit_triangle(s, t):
+        return 'Segment in triangle'
+    else:
+        return 'Segment outside triangle'
+
+
+@try_all_orderings
 def single_segment_triangle(seg, tri) -> SpaceOrder:
     '''
     Decide if the segment uv intersects triangle abc.
 
+    >>> from numpy import transpose as T
+
     >>> ang = np.linspace(0, 2*np.pi, 9, endpoint=False)
     >>> cos, sin, zero, one = np.cos(ang), np.sin(ang), np.zeros(9), np.ones(9)
-    >>> from numpy import transpose as T
     >>> a, b, c, d, e, f, g, h, i = T((cos, sin, zero, one))
     >>> j, k, l, m, n, o, p, q, r = T((cos, sin, sin, one))
 
-    >>> print(single_segment_triangle(T([a, d]), T([f, g, i])))
+    >>> print(single_segment_triangle(T([a, f]), T([d, g, i])))
     SpaceOrder.coplanar
-    >>> print(single_segment_triangle(T([p, q]), T([f, g, i])))
+    >>> print(single_segment_triangle(T([p, k]), T([f, g, i])))
     SpaceOrder.below
-    >>> print(single_segment_triangle(T([k, l]), T([a, c, d])))
+    >>> print(single_segment_triangle(T([k, m]), T([a, c, e])))
     SpaceOrder.above
     >>> print(single_segment_triangle(T([a, b]), T([a, b, c])))
     SpaceOrder.coplanar
@@ -133,102 +209,154 @@ def single_segment_triangle(seg, tri) -> SpaceOrder:
     SpaceOrder.below
     >>> print(single_segment_triangle(T([r, l]), T([b, d, e])))
     SpaceOrder.above
+
+    >>> seg = T([[-0.20034532632547686, -0.23317272489713337,
+    ...           -0.3155601343530847, 1.0],
+    ...          [-0.07963219791251097, -0.16966517899612588,
+    ...           -0.36542005465506644, 1.0]])
+    >>> tri = T([[-0.2953513659621575, 0.1192709663506637,
+    ...           0.013578121265746423, 1.0],
+    ...          [-0.07963219791251097, -0.16966517899612588,
+    ...           -0.36542005465506644, 1.0],
+    ...          [0.049662477878709144, -0.06467760738172312,
+    ...           0.029142094277039066, 1.0]])
+
+    # >>> print(single_segment_triangle(seg, tri))
+    # SpaceOrder.above
+
     '''
     seg = np.asarray(seg)
     tri = np.asarray(tri)
-    assert seg.shape == (4, 2)  # Homogenous 3D segment
+    assert seg.shape == (4, 2), seg.shape  # Homogenous 3D segment
     assert tri.shape == (4, 3)  # Homogenous 3D triangle
     assert np.allclose(seg[3], 1)  # Normalized
     assert np.allclose(tri[3], 1)  # Normalized
     a, b, c = tri.T
-    d = np.append(np.cross(b[:3] - a[:3], c[:3] - a[:3]), 0)
     # Maps (1,0,0,1) to (b-a) + a
     # Maps (0,1,0,1) to (c-a) + a
-    # Maps (0,0,1,1) to d + a
-    tri_to_world = np.transpose([b-a, c-a, d, a])
+    # Maps (0,0,1,1) to (0,0,1,0) + a
+    tri_to_world = np.transpose([b-a, c-a, (0, 0, 1, 0), a])
     world_to_tri = np.linalg.inv(tri_to_world)
     seg_on_tri = world_to_tri @ seg
     assert seg_on_tri.shape == (4, 2), seg_on_tri.shape
-    if np.allclose(seg_on_tri[2], 0):
-        return SpaceOrder.coplanar
     # Compute e[n] such that u+e[n](v-u) intersects xn-plane,
     # i.e. (u + e[n] (v-u))[n] = 0,
     # i.e. u[n] + e[n] (v[n]-u[n]) = 0,
     # i.e. e[n] = -u[n] / (v[n]-u[n])
     u, v = seg_on_tri.T
-    denom = v[:3] - u[:3]
-    zero = np.isclose(denom, 0)
-    denom[zero] = 1
-    e = -u[:3] / denom
-    if 0 < e[2] < 1 and not zero[2]:
-        # Segment intersects z=0 plane
-        # Compute intersection point with z=0 plane
-        iz = u + e[2] * (v - u)
-        # Decide if intersection point is inside triangle
-        if in_unit_triangle(*iz[:2]):
-            return SpaceOrder.through
-        # Decide if either endpoint is in triangle
+    uv = v - u
+    zero = np.isclose(uv, 0)
+    uv[zero] = 1
+    e = -u / uv
+    i = u + e.reshape(-1, 1) * uv
+    # i[n] is the intersection with the xn-plane
+
+    if zero[0] and zero[1]:
+        # Parallel to z-axis
         if in_unit_triangle(*u[:2]):
-            return order_from_sign(u[2])
-        elif in_unit_triangle(*v[:2]):
-            return order_from_sign(v[2])
-        # Check intersection points with x-plane and y-plane
-        ix = u + e[0] * (v - u)
-        if 0 <= ix[0] <= 1 and not zero[0]:
-            return order_from_sign(ix[2])
-        iy = u + e[1] * (v - u)
-        if 0 <= iy[0] <= 1 and not zero[1]:
-            return order_from_sign(iy[2])
-        return SpaceOrder.disjoint
+            return SpaceOrder.through
+        else:
+            return SpaceOrder.disjoint
+
+    if zero[0]:
+        # Parallel to y-plane
+        plane_intersection = (0 <= u[0] <= 1 and
+                              0 <= max(u[1], v[1]) and
+                              min(u[1], v[1]) <= 1 - u[0])
+    elif zero[1]:
+        # Parallel to x-plane
+        plane_intersection = (0 <= u[1] <= 1 and
+                              0 <= max(u[0], v[0]) and
+                              min(u[0], v[0]) <= 1 - u[1])
     else:
-        # Segment is on one side of z=0 plane -
-        # just check z coordinate of either endpoint
-        return order_from_sign((seg_on_tri[2, 0] + seg_on_tri[2, 1]) * d[2])
-    print(seg_on_tri)
+        plane_intersection = (
+            -EPS <= i[0][1] <= 1+EPS or
+            -EPS <= i[1][0] <= 1+EPS or
+            in_unit_triangle(*u[:2]) or
+            in_unit_triangle(*v[:2]))
+
+    if not plane_intersection:
+        return SpaceOrder.disjoint
+
+    if zero[2]:
+        # Parallel to z-plane
+        if np.isclose(u[2], 0):
+            return SpaceOrder.coplanar
+        else:
+            return SpaceOrder.from_sign(u[2])
+
+    if in_unit_triangle(*i[2][:2]):
+        return SpaceOrder.through
+    if i[2][0] < 0 or np.isclose(i[2][0], 0):
+        # Intersection not right of y-plane
+        if max(u[0], v[0]) < EPS:
+            return SpaceOrder.disjoint
+        else:
+            return SpaceOrder.from_sign(uv[0] * uv[2])
+    elif i[2][1] < 0 or np.isclose(i[2][1], 0):
+        # Intersection not above x-plane
+        if max(u[1], v[1]) < EPS:
+            return SpaceOrder.disjoint
+        else:
+            return SpaceOrder.from_sign(uv[1] * uv[2])
+    elif min(u[0]+u[1], v[0]+v[1]) > 1-EPS:
+        return SpaceOrder.disjoint
+    elif zero[1] or (not zero[0] and -1 < uv[0] / uv[1] < 1):
+        # Intersection in first quadrant, horizontal line
+        return SpaceOrder.from_sign(-uv[0] * uv[2])
+    else:
+        # Intersection in first quadrant, vertical line
+        return SpaceOrder.from_sign(-uv[1] * uv[2])
 
 
+def segment_triangle(seg, tri):
+    # TODO vectorize this
+    seg = np.asarray(seg)
+    tri = np.asarray(tri)
+    assert tri.shape == (4, 3)  # Homogenous 3D triangle
+    if seg.ndim == 2:
+        return single_segment_triangle(seg, tri)
+    assert seg.ndim == 3
+    assert seg.shape[0] == 4  # Homogenous 3D
+    assert seg.shape[2] == 2  # Segments
+    return np.array([single_segment_triangle(s, tri).value
+                     for s in seg.transpose((1, 0, 2))])
 
-def vertex_behind(vertex, triangle):
-    vertex = np.asarray(vertex)
-    local, proj = project(vertex, triangle)
-    x = local[..., 0]
-    y = local[..., 1]
-    orig_z = vertex[..., 2]
-    z = proj[..., 2]
-    return ((0 <= x) & (x <= 1) & (0 <= y) & (y <= 1) &
-            (0 <= x + y) & (x + y <= 1) & (orig_z < z))
 
+def triangle_order(tri1, tri2):
+    '''
+    >>> from numpy import transpose as T
+    >>> tri1 = T(((-0.2953513659621575, 0.1192709663506637, 0.013578121265746423, 1.0), (-0.07963219791251097, -0.16966517899612588, -0.36542005465506644, 1.0), (0.049662477878709144, -0.06467760738172312, 0.029142094277039066, 1.0)))
+    >>> tri2 = T(((-0.20034532632547686, -0.23317272489713337, -0.3155601343530847, 1.0), (-0.07963219791251097, -0.16966517899612588, -0.36542005465506644, 1.0), (-0.2953513659621575, 0.1192709663506637, 0.013578121265746423, 1.0)))
 
-def triangle_behind(query_triangle, triangle):
-    query_triangle = np.asarray(query_triangle)
-    local, proj = project(query_triangle, triangle)
-    x = local[..., 0]
-    y = local[..., 1]
-    orig_z = query_triangle[..., 2]
-    z = proj[..., 2]
-    v = np.any((0 <= x) & (x <= 1) & (0 <= y) & (y <= 1) &
-               (0 <= x + y) & (x + y <= 1) & (orig_z < z))
-    if v:
-        print("Node behind")
-        return v
-    for edge in range(3):
-        p1 = local[edge]
-        z1 = query_triangle[edge, 2]
-        p2 = local[(edge+1)%3]
-        z2 = query_triangle[(edge+1)%3, 2]
-        for dim in range(2):
-            if p1[dim] * p2[dim] < 0:
-                ratio = -p1[1-dim] * (p2[1-dim] - p1[1-dim])
-                intersection = p1[dim] + ratio * (p2[dim] - p1[dim])
-                if 0 <= intersection <= 1:
-                    # Edges intersect
-                    z_base = triangle[0, 2]
-                    z_ext = triangle[1+dim, 2]
-                    z_at_intersection = z_base + (z_ext - z_base) * intersection
-                    z_on_edge = z1 + ratio * (z2 - z1)
-                    if z_on_edge < z_at_intersection:
-                        print("Edge behind")
-                        return True
+    # >>> print(triangle_order(tri1, tri2))
+    # SpaceOrder.above
+    # >>> print(triangle_order(tri2, tri1))
+    # SpaceOrder.below
+    '''
+
+    tri1 = np.asarray(tri1)
+    assert tri1.shape == (4, 3), tri1.shape
+    segs = tri1[:, [0, 1, 1, 2, 2, 0]].reshape(4, 3, 2)
+    o1 = segment_triangle(segs, tri2)
+    any_above = np.any(o1 == SpaceOrder.above.value)
+    any_below = np.any(o1 == SpaceOrder.below.value)
+    if any_below and any_above:
+        raise AssertionError("Does this mean through?")
+    if any_below:
+        return SpaceOrder.below
+    if any_above:
+        return SpaceOrder.above
+    any_through = np.any(o1 == SpaceOrder.through.value)
+    if any_through:
+        return SpaceOrder.through
+    all_disjoint = np.all(o1 == SpaceOrder.disjoint.value)
+    if all_disjoint:
+        return SpaceOrder.disjoint
+    all_coplanar = np.all(o1 == SpaceOrder.coplanar.value)
+    if all_coplanar:
+        return SpaceOrder.coplanar
+    return SpaceOrder.disjoint
 
 
 def z_order(faces):
@@ -238,9 +366,6 @@ def z_order(faces):
     if d != 3:
         assert d == 4  # Homogenous 3D coordinates
         assert np.allclose(faces[:, :, 3], 1)  # Normalized
-
-    centroids = np.mean(faces, axis=1, keepdims=True)
-    face_shrink = faces * .99 + centroids * .01
 
     f_min = np.min(faces, axis=1)
     f_max = np.max(faces, axis=1)
@@ -262,16 +387,18 @@ def z_order(faces):
     before = {}
 
     for i1, i2 in zip(i1s, i2s):
-        b1 = triangle_behind(faces[i1], faces[i2])
-        b2 = triangle_behind(faces[i2], faces[i1])
-        if b1 and b2:
-            print(i1, i2)
-            raise AssertionError("2-cycle")
-        if not b1 and not b2:
+        o = triangle_order(faces[i1].T, faces[i2].T)
+        o2 = triangle_order(faces[i2].T, faces[i1].T).flip()
+        if o != o2:
+            # for x in (faces[i1].T, faces[i2].T):
+            #     print('T([%s])' % ', '.join('[%s]' % ', '.join(map(repr, row))
+            #                                 for row in x.T.tolist()))
+            # raise AssertionError((o, o2))
             continue
-        if b1 or not b2:
-            i2, i1 = i1, i2
-        before.setdefault(i1, []).append(i2)
+        if o == SpaceOrder.below:
+            before.setdefault(i2, []).append(i1)
+        elif o == SpaceOrder.above:
+            before.setdefault(i1, []).append(i2)
 
     print(before)
 
@@ -294,6 +421,7 @@ def z_order(faces):
                 state[stack[-1]] = 2
             stack.pop()
     assert np.all(state == 2)
+    output.reverse()
     print(output)
     return np.array(output, np.intp)
 
