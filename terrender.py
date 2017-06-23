@@ -14,7 +14,7 @@ APP_NAME = 'terrender'
 
 
 class Terrain:
-    def __init__(self, n=5, seed=2):
+    def __init__(self, n=10, seed=2):
         rng = np.random.RandomState(seed)
         corners = np.array([
             [-2, -3],
