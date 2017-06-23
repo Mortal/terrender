@@ -5,6 +5,7 @@ import itertools
 import contextlib
 import enum
 import functools
+from predicates import intersects
 
 
 EPS = 1e-9
@@ -336,7 +337,18 @@ def triangle_order(tri1, tri2):
     '''
 
     tri1 = np.asarray(tri1)
+    tri2 = np.asarray(tri2)
     assert tri1.shape == (4, 3), tri1.shape
+    assert tri2.shape == (4, 3), tri2.shape
+
+    points1 = tri1[0] + 1j * tri1[1]
+    points2 = tri2[0] + 1j * tri2[1]
+    intersections = intersects(points1, np.roll(points1, 1),
+                               points2, np.roll(points2, 1))
+
+    vec1 = tri1 - np.roll(tri1, 1, 1)
+    vec2 = tri2 - np.roll(tri2, 1, 1)
+
     segs = tri1[:, [0, 1, 1, 2, 2, 0]].reshape(4, 3, 2)
     o1 = segment_triangle(segs, tri2)
     any_above = np.any(o1 == SpaceOrder.above.value)
