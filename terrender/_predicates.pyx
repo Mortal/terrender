@@ -249,8 +249,7 @@ cpdef int triangle_order(np.ndarray[DTYPE_t, ndim=2] t1, np.ndarray[DTYPE_t, ndi
     return DISJOINT
 
 
-def order_overlapping_triangles(np.ndarray faces):
-    assert faces.ndim == 3
+def order_overlapping_triangles(np.ndarray[DTYPE_t, ndim=3] faces):
     cdef Py_ssize_t n, k, d
     n, k, d = faces.shape[0], faces.shape[1], faces.shape[2]
     assert k == 3  # Triangles
