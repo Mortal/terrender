@@ -117,14 +117,6 @@ def project_affine_2d(p0, p1, p2, x):
     return coords
 
 
-# def unproject_affine_batch(p0, p1, p2, coords):
-#     p0, p1, p2 = np.asarray(p0), np.asarray(p1), np.asarray(p2)
-#     coords = np.asarray(coords)
-#     assert p0.shape == p1.shape == p2.shape
-#     assert p0.shape[1:] == coords.shape[1:]
-#     return p0 + p1 * coords[0:1] + p2 * coords[1:2]
-
-
 def unproject_affine(p0, p1, p2, coords, ndim):
     p0, p1, p2 = np.asarray(p0), np.asarray(p1), np.asarray(p2)
     coords = np.asarray(coords)
