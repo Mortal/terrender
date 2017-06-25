@@ -20,7 +20,7 @@ class SpaceOrder(enum.Enum):
         return cls.above if sign > 0 else cls.below
 
 
-def triangle_order(t1, t2, output: 'IpeOutput'=None):
+def triangle_order(t1, t2):
     nvertices, ndim = t1.shape
     assert t1.shape == t2.shape
     assert nvertices == 3, t1.shape  # Triangles
@@ -34,8 +34,8 @@ def triangle_order(t1, t2, output: 'IpeOutput'=None):
     # print(d, b)
     proper_overlap = b and not np.isclose(d, 0)
 
-    if output is not None:
-        with output.open_page() as page:
+    if DEBUG_OUTPUT is not None:
+        with DEBUG_OUTPUT.open_page() as page:
             page.face(t1)
             page.face(t2)
             page.label(x, y, '%.0g' % d if proper_overlap else 'D')
