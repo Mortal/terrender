@@ -56,6 +56,7 @@ def page_writer(fp):
 def open_multipage_writer(filename):
     print("Render", filename)
     with open(filename, 'w') as fp:
+        from terrender import APP_NAME
         print('<ipe version="70000" creator="%s">' % APP_NAME, file=fp)
         try:
             yield functools.partial(page_writer, fp)
