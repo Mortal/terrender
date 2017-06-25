@@ -5,7 +5,7 @@ import itertools
 import contextlib
 import enum
 import functools
-import predicates
+from terrender import predicates
 
 
 EPS = 1e-9
