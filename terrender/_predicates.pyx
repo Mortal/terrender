@@ -252,7 +252,7 @@ def order_overlapping_triangles(np.ndarray[DTYPE_t, ndim=3] faces):
         assert np.allclose(faces[:, :, 3], 1)  # Normalized
 
     cdef Py_ssize_t output_size = 0
-    cdef np.ndarray[Py_ssize_t, ndim=2] output_buffer = np.zeros((n*(n-1)//2, 2), dtype=np.intp)
+    cdef np.ndarray[Py_ssize_t, ndim=2] output_buffer = np.zeros((n*(n-1), 2), dtype=np.intp)
     cdef Py_ssize_t i1, i2
     cdef int o
     for i1 in range(n):
