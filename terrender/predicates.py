@@ -87,12 +87,17 @@ def intersects(p1, q1, p2, q2):
 
 
 @cythonized
-def change_basis_2d(p1, p2, x):
+def change_basis_2d_inplace(p1, p2, x):
     p1, p2, x = np.asarray(p1), np.asarray(p2), np.asarray(x)
     assert p1.shape == p2.shape == (2,)
     assert 1 <= x.ndim <= 2
     assert x.shape[0] == 2
-    c = np.linalg.inv(np.c_[p1, p2]) @ x
+    x[:] = np.linalg.inv(np.c_[p1, p2]) @ x
+    return x
+
+
+def change_basis_2d(p1, p2, x):
+    c = change_basis_2d_inplace(p1, p2, np.array(x))
     assert np.allclose(np.c_[p1, p2] @ c, x)
     return c
 

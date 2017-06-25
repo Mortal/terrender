@@ -24,7 +24,16 @@ def rot_4d_xy(angle):
     ])
 
 
-def matrix_inv(DTYPE_t a, DTYPE_t b, DTYPE_t c, DTYPE_t d):
+def change_basis_2d_inplace(np.ndarray[DTYPE_t] p1, np.ndarray[DTYPE_t] p2, np.ndarray[DTYPE_t, ndim=2] x):
+    if p1.shape[0] != 2 or p2.shape[0] != 2:
+        raise TypeError('only 2-dimensional points are supported')
+    if x.shape[0] != 2:
+        raise TypeError('x must be 2 x N')
+
+    cdef DTYPE_t a = p1[0]
+    cdef DTYPE_t b = p2[0]
+    cdef DTYPE_t c = p1[1]
+    cdef DTYPE_t d = p2[1]
     #              ⎡    d         -b    ⎤
     #         -1   ⎢─────────  ─────────⎥
     # ⎛⎡a  b⎤⎞     ⎢a⋅d - b⋅c  a⋅d - b⋅c⎥
@@ -32,34 +41,24 @@ def matrix_inv(DTYPE_t a, DTYPE_t b, DTYPE_t c, DTYPE_t d):
     # ⎝⎣c  d⎦⎠     ⎢   -c          a    ⎥
     #              ⎢─────────  ─────────⎥
     #              ⎣a⋅d - b⋅c  a⋅d - b⋅c⎦
+    cdef DTYPE_t D = a * d - b * c
+    cdef Py_ssize_t i
+    cdef DTYPE_t x1, x2
+    for i in range(x.shape[1]):
+        x1 = x[0, i]
+        x2 = x[1, i]
+        x[0, i] = (d * x1 - b * x2) / D
+        x[1, i] = (a * x2 - c * x1) / D
 
-    D = a * d - b * c
-    return np.array([[d, -b], [-c, a]]) / D
-
-
-def change_basis_2d(np.ndarray p1, np.ndarray p2, np.ndarray x):
-    if p1.ndim != 1 or p2.ndim != 1:
-        raise TypeError('only 1-dimensional arrays are supported')
-    if p1.shape[0] != 2 or p2.shape[0] != 2:
-        raise TypeError('only 2-dimensional points are supported')
-    if x.ndim == 1:
-        x = x.reshape(-1, 1)
-    elif x.ndim != 2:
-        raise TypeError('x must be 2D')
-    if x.shape[0] != 2:
-        raise TypeError('x must be 2 x N')
-    m = matrix_inv(p1[0], p2[0], p1[1], p2[1])
-    return m @ x
+    return x
 
 
-def project_affine_2d(np.ndarray p0, np.ndarray p1, np.ndarray p2, np.ndarray x):
-    assert x.ndim == 2
-    d = x.shape[0]
-    n = x.shape[1]
-    assert d == 2
-    assert p0.ndim == p1.ndim == p2.ndim == 1
-    assert p0.shape[0] == p1.shape[0] == p2.shape[0] == 2
-    coords = change_basis_2d(p1 - p0, p2 - p0, x - p0.reshape(d, 1))
+def project_affine_2d(np.ndarray[DTYPE_t] p0, np.ndarray[DTYPE_t] p1, np.ndarray[DTYPE_t] p2, np.ndarray[DTYPE_t, ndim=2] x):
+    cdef Py_ssize_t d = x.shape[0]
+    cdef Py_ssize_t n = x.shape[1]
+    assert d == p0.shape[0] == p1.shape[0] == p2.shape[0] == 2
+    cdef np.ndarray[DTYPE_t, ndim=2] coords
+    coords = change_basis_2d_inplace(p1 - p0, p2 - p0, x - p0.reshape(d, 1))
     return coords
 
 
