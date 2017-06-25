@@ -25,11 +25,13 @@ def rot_4d_xy(angle):
     ])
 
 
-def change_basis_2d_inplace(np.ndarray[DTYPE_t] p1, np.ndarray[DTYPE_t] p2, np.ndarray[DTYPE_t, ndim=2] x):
+def change_basis_2d_inplace(np.ndarray[DTYPE_t] p1, np.ndarray[DTYPE_t] p2,
+                            np.ndarray[DTYPE_t, ndim=2] input,
+                            np.ndarray[DTYPE_t, ndim=2] output):
     if p1.shape[0] != 2 or p2.shape[0] != 2:
         raise TypeError('only 2-dimensional points are supported')
-    if x.shape[0] != 2:
-        raise TypeError('x must be 2 x N')
+    if input.shape[0] != 2:
+        raise TypeError('input must be 2 x N')
 
     cdef DTYPE_t a = p1[0]
     cdef DTYPE_t b = p2[0]
@@ -45,26 +47,33 @@ def change_basis_2d_inplace(np.ndarray[DTYPE_t] p1, np.ndarray[DTYPE_t] p2, np.n
     cdef DTYPE_t D = a * d - b * c
     cdef Py_ssize_t i
     cdef DTYPE_t x1, x2
-    for i in range(x.shape[1]):
-        x1 = x[0, i]
-        x2 = x[1, i]
-        x[0, i] = (d * x1 - b * x2) / D
-        x[1, i] = (a * x2 - c * x1) / D
+    for i in range(input.shape[1]):
+        x1 = input[0, i]
+        x2 = input[1, i]
+        output[0, i] = (d * x1 - b * x2) / D
+        output[1, i] = (a * x2 - c * x1) / D
 
-    return x
+    return output
 
 
 cpdef np.ndarray[DTYPE_t, ndim=2] project_affine_2d_inplace(
     np.ndarray[DTYPE_t] p0,
     np.ndarray[DTYPE_t] p1,
     np.ndarray[DTYPE_t] p2,
-    np.ndarray[DTYPE_t, ndim=2] x):
-    cdef Py_ssize_t d = x.shape[0]
-    cdef Py_ssize_t n = x.shape[1]
-    assert d == p0.shape[0] == p1.shape[0] == p2.shape[0] == 2
-    x -= p0.reshape(d, 1)
-    change_basis_2d_inplace(p1 - p0, p2 - p0, x)
-    return x
+    np.ndarray[DTYPE_t, ndim=2] input,
+    np.ndarray[DTYPE_t, ndim=2] output):
+    cdef Py_ssize_t d = input.shape[0]
+    cdef Py_ssize_t n = input.shape[1]
+    assert output.shape[0] == d
+    assert output.shape[1] == n
+    assert d == 2
+    assert p0.shape[0] == p1.shape[0] == p2.shape[0] == 2
+    cdef Py_ssize_t i
+    for i in range(n):
+        output[0, i] = input[0, i] - p0[0]
+        output[1, i] = input[1, i] - p0[1]
+    change_basis_2d_inplace(p1 - p0, p2 - p0, output, output)
+    return output
 
 
 def unproject_affine(np.ndarray[DTYPE_t] p0,
@@ -115,7 +124,7 @@ def in_triangle_2d(np.ndarray[DTYPE_t] p0,
                    np.ndarray[DTYPE_t] p2,
                    np.ndarray[DTYPE_t, ndim=2] x):
     cdef np.ndarray[DTYPE_t, ndim=2] coords = np.array(x)
-    project_affine_2d_inplace(p0, p1, p2, coords)
+    project_affine_2d_inplace(p0, p1, p2, coords, coords)
     return in_triangle_2d_coords(coords)
 
 
@@ -135,8 +144,9 @@ cdef inline DTYPE_t float_min(DTYPE_t a, DTYPE_t b): return a if a <= b else b
 cpdef DTYPE_t linear_interpolation_2d_single(np.ndarray[DTYPE_t, ndim=2] triangle,
                                              DTYPE_t x, DTYPE_t y) except DTYPE_ERR:
     cdef np.ndarray[DTYPE_t] coords = np.array([x, y, 0])
-    project_affine_2d_inplace(triangle[0, :2], triangle[1, :2], triangle[2, :2], coords[:2].reshape(2, 1))
-    unproject_affine_3d_inplace(triangle[0], triangle[1], triangle[2], coords)
+    cdef np.ndarray[DTYPE_t, ndim=2] c = coords[:2].reshape(2, 1)
+    project_affine_2d_inplace(triangle[0, :2], triangle[1, :2], triangle[2, :2], c, c)
+    unproject_affine_3d_inplace(triangle[0, :3], triangle[1, :3], triangle[2, :3], coords)
     return coords[2]
 
 
@@ -162,14 +172,14 @@ cdef inline int isclose(DTYPE_t a, DTYPE_t b):
     return absdiff <= atol + rtol * abs(b)
 
 
-cpdef int triangle_order(np.ndarray[DTYPE_t, ndim=2] t1, np.ndarray[DTYPE_t, ndim=2] t2) except -1:
+cdef int triangle_order(np.ndarray[DTYPE_t, ndim=2] t1, np.ndarray[DTYPE_t, ndim=2] t2,
+                        np.ndarray[DTYPE_t, ndim=2] coords) except -1:
+    # coords is the coordinates of t2 relative to t1
     cdef Py_ssize_t nvertices = 3
     cdef Py_ssize_t ndim = t1.shape[1]
     assert t1.shape[0] == t2.shape[0] == nvertices
     assert ndim == t2.shape[1] == 4
 
-    cdef np.ndarray[DTYPE_t, ndim=2] coords = np.array(t2[:, :2].T)
-    project_affine_2d_inplace(t1[0, :2], t1[1, :2], t1[2, :2], coords)
     assert coords.shape[0] == 2 and coords.shape[1] == 3
 
     if bbox_disjoint_2d(t1, t2):
@@ -196,7 +206,7 @@ cpdef int triangle_order(np.ndarray[DTYPE_t, ndim=2] t1, np.ndarray[DTYPE_t, ndi
 
             intersection[j] = y_intersection
             intersection[1-j] = 0
-            unproject_affine_3d_inplace(t1[0], t1[1], t1[2], intersection)
+            unproject_affine_3d_inplace(t1[0, :3], t1[1, :3], t1[2, :3], intersection)
             diff = (intersection[2] -
                     linear_interpolation_2d_single(t2, intersection[0], intersection[1]))
             if not isclose(diff, 0):
@@ -221,7 +231,7 @@ cpdef int triangle_order(np.ndarray[DTYPE_t, ndim=2] t1, np.ndarray[DTYPE_t, ndi
 
         intersection[0] = (sum_intersection + 1)/2
         intersection[1] = (1 - sum_intersection)/2
-        unproject_affine_3d_inplace(t1[0], t1[1], t1[2], intersection)
+        unproject_affine_3d_inplace(t1[0, :3], t1[1, :3], t1[2, :3], intersection)
         diff = (intersection[2] -
                 linear_interpolation_2d_single(t2, intersection[0], intersection[1]))
         if not isclose(diff, 0):
@@ -235,7 +245,7 @@ cpdef int triangle_order(np.ndarray[DTYPE_t, ndim=2] t1, np.ndarray[DTYPE_t, ndi
             continue
 
         intersection[:2] = coords[:, i]
-        unproject_affine_3d_inplace(t1[0], t1[1], t1[2], intersection)
+        unproject_affine_3d_inplace(t1[0, :3], t1[1, :3], t1[2, :3], intersection)
         diff = (intersection[2] -
                 linear_interpolation_2d_single(t2, intersection[0], intersection[1]))
 
@@ -257,11 +267,17 @@ def order_overlapping_triangles(np.ndarray[DTYPE_t, ndim=3] faces):
     cdef np.ndarray[Py_ssize_t, ndim=2] output_buffer = np.zeros((n*(n-1), 2), dtype=np.intp)
     cdef Py_ssize_t i1, i2
     cdef int o
+    cdef np.ndarray[DTYPE_t, ndim=2] coords_buffer = np.zeros((n*k, 2), dtype=DTYPE)
     for i1 in range(n):
+        project_affine_2d_inplace(faces[i1, 0, :2],
+                                  faces[i1, 1, :2],
+                                  faces[i1, 2, :2],
+                                  faces[:, :, :2].reshape(n*k, 2).T,
+                                  coords_buffer.T)
         for i2 in range(n):
             if i1 == i2:
                 continue
-            o = triangle_order(faces[i1], faces[i2])
+            o = triangle_order(faces[i1], faces[i2], coords_buffer[3*i2:3*i2+3].T)
             if o == DISJOINT:
                 continue
             elif o == BELOW:

@@ -21,7 +21,6 @@ class SpaceOrder(enum.Enum):
         return cls.above if sign > 0 else cls.below
 
 
-@cythonized
 def triangle_order(t1, t2):
     nvertices, ndim = t1.shape
     assert t1.shape == t2.shape
