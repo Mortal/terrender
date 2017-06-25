@@ -75,7 +75,8 @@ class IpeOutput:
         self._write('</ipe>')
         self._fp.close()
         self._fp = None
-        print("Done with", self._filename)
+        if val is None:
+            print("Done with", self._filename)
 
     def open_page(self):
         return IpeOutputPage(self)
