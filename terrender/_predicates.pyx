@@ -130,7 +130,8 @@ cdef inline DTYPE_t float_max(DTYPE_t a, DTYPE_t b): return a if a >= b else b
 cdef inline DTYPE_t float_min(DTYPE_t a, DTYPE_t b): return a if a <= b else b
 
 
-cpdef DTYPE_t linear_interpolation_2d_single(triangle, x, y):
+cpdef DTYPE_t linear_interpolation_2d_single(np.ndarray[DTYPE_t, ndim=2] triangle,
+                                             DTYPE_t x, DTYPE_t y):
     cdef np.ndarray[DTYPE_t, ndim=2] coords = np.array([x, y]).reshape(2, 1)
     project_affine_2d_inplace(triangle[0, :2], triangle[1, :2], triangle[2, :2], coords)
     res = unproject_affine_3d(triangle[0], triangle[1], triangle[2], coords)
@@ -171,8 +172,8 @@ cpdef int triangle_order(np.ndarray[DTYPE_t, ndim=2] t1, np.ndarray[DTYPE_t, ndi
         t1 = t1[:, :3]
         t2 = t2[:, :3]
 
-    cdef np.ndarray[DTYPE_t, ndim=2] coords
-    coords = project_affine_2d_inplace(t1[0, :2], t1[1, :2], t1[2, :2], np.array(t2[:, :2].T))
+    cdef np.ndarray[DTYPE_t, ndim=2] coords = np.array(t2[:, :2].T)
+    project_affine_2d_inplace(t1[0, :2], t1[1, :2], t1[2, :2], coords)
     assert coords.shape[0] == 2 and coords.shape[1] == 3
 
     if bbox_disjoint_2d(t1, t2):
