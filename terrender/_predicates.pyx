@@ -114,7 +114,7 @@ cdef inline DTYPE_t float_max(DTYPE_t a, DTYPE_t b): return a if a >= b else b
 cdef inline DTYPE_t float_min(DTYPE_t a, DTYPE_t b): return a if a <= b else b
 
 
-def linear_interpolation_2d_single(triangle, x, y):
+cpdef DTYPE_t linear_interpolation_2d_single(triangle, x, y):
     cdef np.ndarray[DTYPE_t, ndim=2] coords = np.array([x, y]).reshape(2, 1)
     project_affine_2d_inplace(triangle[0, :2], triangle[1, :2], triangle[2, :2], coords)
     res = unproject_affine_3d(triangle[0], triangle[1], triangle[2], coords)
