@@ -17,7 +17,7 @@ def main():
     parser.add_argument('-f', '--field-of-view', type=float)
     args = parser.parse_args()
 
-    t = Terrain(40)
+    t = Terrain(100)
     with contextlib.ExitStack() as stack:
         if args.debug_output:
             stack.enter_context(
