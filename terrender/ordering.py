@@ -82,7 +82,7 @@ def order_overlapping_triangles(faces):
     dup = i1s < i2s
     i1s, i2s = i1s[dup], i2s[dup]
 
-    before = {}
+    before = []
 
     for i1, i2 in zip(i1s, i2s):
         o = triangle_order(faces[i1], faces[i2])
@@ -96,18 +96,20 @@ def order_overlapping_triangles(faces):
                         page.label(x, y, '%g' % z)
             raise AssertionError('inversion')
         if SpaceOrder.below in (o, o2):
-            before.setdefault(i2, []).append(i1)
+            before.append((i2, i1))
         elif SpaceOrder.above in (o, o2):
-            before.setdefault(i1, []).append(i2)
+            before.append((i1, i2))
 
-    return before
+    return np.array(before)
 
 
 def z_order(faces):
     faces = np.asarray(faces)
     n = len(faces)
-    before = order_overlapping_triangles(faces)
-    # print(before)
+    before_list = order_overlapping_triangles(faces)
+    before = {}
+    for i, j in before_list:
+        before.setdefault(i, []).append(j)
 
     state = np.zeros(n)
     output = []
