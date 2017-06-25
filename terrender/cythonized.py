@@ -1,4 +1,5 @@
 import numpy as np
+import functools
 
 
 class DifferentResults(Exception):
@@ -53,7 +54,20 @@ def compare_results(path, fast, slow):
 _running_slow = False
 
 
-def cythonized(fn):
+def compare_edges(path, fast, slow):
+    if type(fast) != type(slow):
+        raise DifferentResults(path, type(fast).__name__, type(slow).__name__)
+    if fast.shape[1:] != slow.shape[1:]:
+        raise DifferentResults(
+            path, 'shape %r' % (fast.shape,), 'shape %r' % (slow.shape,))
+    set1 = set(map(tuple, fast))
+    set2 = set(map(tuple, slow))
+    if set1 ^ set2:
+        raise DifferentResults(path, repr(sorted(set1 - set2)),
+                               repr(sorted(set2 - set1)))
+
+
+def cythonized(fn, comparator=compare_results):
     if __debug__:
         try:
             import terrender._predicates
@@ -70,7 +84,7 @@ def cythonized(fn):
             try:
                 fast_result = fast_fn(*args, **kwargs)
                 slow_result = fn(*args, **kwargs)
-                compare_results(fn.__name__, fast_result, slow_result)
+                comparator(fn.__name__, fast_result, slow_result)
                 return fast_result
             finally:
                 _running_slow = False
@@ -92,3 +106,6 @@ def cythonized(fn):
     except AttributeError:
         raise Exception('Could not find Cythonized variant of %s!' %
                         fn.__name__)
+
+
+cythonized.edges = functools.partial(cythonized, comparator=compare_edges)

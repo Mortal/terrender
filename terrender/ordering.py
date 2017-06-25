@@ -59,7 +59,7 @@ def debug_output_to(output: 'IpeOutput'):
         DEBUG_OUTPUT = None
 
 
-@cythonized
+@cythonized.edges
 def order_overlapping_triangles(faces):
     faces = np.asarray(faces)
     n, k, d = faces.shape
