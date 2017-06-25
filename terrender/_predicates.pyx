@@ -139,12 +139,18 @@ cpdef DTYPE_t linear_interpolation_2d_single(triangle, x, y):
 
 
 cdef int bbox_disjoint_2d(np.ndarray[DTYPE_t, ndim=2] t1, np.ndarray[DTYPE_t, ndim=2] t2):
-    min1 = t1.min(axis=0)
-    max1 = t1.max(axis=0)
-    min2 = t2.min(axis=0)
-    max2 = t2.max(axis=0)
-    o = (min1 < max2) & (min2 < max1)
-    return not (o[0] and o[1])
+    assert t1.shape[0] == t2.shape[0] == 3
+    min10 = float_min(float_min(t1[0, 0], t1[1, 0]), t1[2, 0])
+    min11 = float_min(float_min(t1[0, 1], t1[1, 1]), t1[2, 1])
+    max10 = float_max(float_max(t1[0, 0], t1[1, 0]), t1[2, 0])
+    max11 = float_max(float_max(t1[0, 1], t1[1, 1]), t1[2, 1])
+    min20 = float_min(float_min(t2[0, 0], t2[1, 0]), t2[2, 0])
+    min21 = float_min(float_min(t2[0, 1], t2[1, 1]), t2[2, 1])
+    max20 = float_max(float_max(t2[0, 0], t2[1, 0]), t2[2, 0])
+    max21 = float_max(float_max(t2[0, 1], t2[1, 1]), t2[2, 1])
+    o0 = (min10 < max20) and (min20 < max10)
+    o1 = (min11 < max21) and (min21 < max11)
+    return not (o0 and o1)
 
 
 cdef inline int isclose(DTYPE_t a, DTYPE_t b):
