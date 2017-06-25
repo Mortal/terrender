@@ -174,7 +174,6 @@ def in_triangle_2d_coords(coords):
     return np.minimum(c0, coords.min(axis=0))
 
 
-@cythonized
 def triangle_intersection_2d_coords(coords):
     ndim, nvertices, n = coords.shape
     coords_flat = coords.reshape(ndim, nvertices*n)
