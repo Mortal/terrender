@@ -53,7 +53,10 @@ def change_basis_2d_inplace(np.ndarray[DTYPE_t] p1, np.ndarray[DTYPE_t] p2, np.n
     return x
 
 
-def project_affine_2d_inplace(np.ndarray[DTYPE_t] p0, np.ndarray[DTYPE_t] p1, np.ndarray[DTYPE_t] p2, np.ndarray[DTYPE_t, ndim=2] x):
+def project_affine_2d_inplace(np.ndarray[DTYPE_t] p0,
+                              np.ndarray[DTYPE_t] p1,
+                              np.ndarray[DTYPE_t] p2,
+                              np.ndarray[DTYPE_t, ndim=2] x):
     cdef Py_ssize_t d = x.shape[0]
     cdef Py_ssize_t n = x.shape[1]
     assert d == p0.shape[0] == p1.shape[0] == p2.shape[0] == 2
@@ -62,21 +65,29 @@ def project_affine_2d_inplace(np.ndarray[DTYPE_t] p0, np.ndarray[DTYPE_t] p1, np
     return x
 
 
-def unproject_affine(np.ndarray p0, np.ndarray p1, np.ndarray p2, np.ndarray coords, int ndim):
-    assert p0.ndim == p1.ndim == p2.ndim == 1
+def unproject_affine(np.ndarray[DTYPE_t] p0,
+                     np.ndarray[DTYPE_t] p1,
+                     np.ndarray[DTYPE_t] p2,
+                     np.ndarray[DTYPE_t, ndim=2] coords,
+                     int ndim):
     assert p0.shape[0] == p1.shape[0] == p2.shape[0] == ndim
     assert coords.shape[0] == 2
-    assert coords.ndim == 2
     return (p0.reshape(ndim, 1) +
             (p1-p0).reshape(ndim, 1) * coords[0:1] +
             (p2-p0).reshape(ndim, 1) * coords[1:2]).reshape(ndim, coords.shape[1])
 
 
-def unproject_affine_2d(np.ndarray p0, np.ndarray p1, np.ndarray p2, np.ndarray coords):
+def unproject_affine_2d(np.ndarray[DTYPE_t] p0,
+                        np.ndarray[DTYPE_t] p1,
+                        np.ndarray[DTYPE_t] p2,
+                        np.ndarray[DTYPE_t, ndim=2] coords):
     return unproject_affine(p0, p1, p2, coords, 2)
 
 
-def unproject_affine_3d(np.ndarray p0, np.ndarray p1, np.ndarray p2, np.ndarray coords):
+def unproject_affine_3d(np.ndarray[DTYPE_t] p0,
+                        np.ndarray[DTYPE_t] p1,
+                        np.ndarray[DTYPE_t] p2,
+                        np.ndarray[DTYPE_t, ndim=2] coords):
     return unproject_affine(p0, p1, p2, coords, 3)
 
 
