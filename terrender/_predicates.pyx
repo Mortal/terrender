@@ -269,11 +269,11 @@ def order_overlapping_triangles(np.ndarray[DTYPE_t, ndim=3] faces):
             elif o1 != DISJOINT and o2 != DISJOINT and o1 == o2:
                 raise AssertionError('inversion')
             elif o1 == BELOW or o2 == ABOVE:
-                output_buffer[output_size, 0] = i2
-                output_buffer[output_size, 1] = i1
-                output_size += 1
-            else:
                 output_buffer[output_size, 0] = i1
                 output_buffer[output_size, 1] = i2
+                output_size += 1
+            else:
+                output_buffer[output_size, 0] = i2
+                output_buffer[output_size, 1] = i1
                 output_size += 1
     return np.array(output_buffer[:output_size])

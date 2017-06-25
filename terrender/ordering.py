@@ -40,7 +40,7 @@ def triangle_order(t1, t2):
         with DEBUG_OUTPUT.open_page() as page:
             page.face(t1)
             page.face(t2)
-            page.label(x, y, '%.0g' % d if proper_overlap else 'D')
+            page.label(x, y, '%s %.0g' % (b, d))
     return (SpaceOrder.from_sign(d).value if proper_overlap
             else SpaceOrder.disjoint.value)
 
@@ -99,9 +99,9 @@ def order_overlapping_triangles(faces):
                         page.label(x, y, '%g' % z)
             raise AssertionError('inversion')
         if SpaceOrder.below in (o, o2):
-            before.append((i2, i1))
-        elif SpaceOrder.above in (o, o2):
             before.append((i1, i2))
+        elif SpaceOrder.above in (o, o2):
+            before.append((i2, i1))
 
     # reshape to return empty (0, 2)-array instead of empty (0,)-array
     return np.array(before).reshape(-1, 2)

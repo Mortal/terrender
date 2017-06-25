@@ -42,10 +42,11 @@ class IpeOutputPage:
         write('h')
         write('</path>')
 
-    def faces(self, order, faces):
+    def faces(self, order, faces, lightness=None):
         for i in order:
             face = faces[i]
-            self.face(face, 1 - min(i/4, 1) * .3)
+            l = lightness[i] if lightness is not None else 1 - min(i/4, 1) * .3
+            self.face(face, l)
             # for i, p in enumerate(face):
             #     self.label(p[0], p[1], '%.0f' % (500 + 1000 * p[2]))
             # centroid = np.mean(face, axis=0)
