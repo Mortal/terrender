@@ -1,4 +1,5 @@
 import numpy as np
+from terrender.cythonized import cythonized
 
 
 def on_segment(p, q, r):
@@ -85,6 +86,7 @@ def intersects(p1, q1, p2, q2):
     return res.reshape(s1 + s2)
 
 
+@cythonized
 def change_basis_2d(p1, p2, x):
     p1, p2, x = np.asarray(p1), np.asarray(p2), np.asarray(x)
     assert p1.shape == p2.shape == (2,)
