@@ -1,4 +1,5 @@
 import enum
+import contextlib
 import numpy as np
 from terrender import predicates
 
@@ -43,6 +44,17 @@ def triangle_order(t1, t2, output: 'IpeOutput'=None):
 
 
 DEBUG_OUTPUT = None
+
+
+@contextlib.contextmanager
+def debug_output_to(output):
+    global DEBUG_OUTPUT
+    assert DEBUG_OUTPUT is None
+    DEBUG_OUTPUT = output
+    try:
+        yield
+    finally:
+        DEBUG_OUTPUT = None
 
 
 def order_overlapping_triangles(faces):
