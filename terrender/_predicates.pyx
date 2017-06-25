@@ -92,6 +92,22 @@ def unproject_affine_3d(np.ndarray[DTYPE_t] p0,
     return unproject_affine(p0, p1, p2, coords, 3)
 
 
+cdef void unproject_affine_3d_inplace(np.ndarray[DTYPE_t] p0,
+                                      np.ndarray[DTYPE_t] p1,
+                                      np.ndarray[DTYPE_t] p2,
+                                      np.ndarray[DTYPE_t] x):
+    '''
+    Given triangle p0p1p2, convert local coordinates (x[0], x[1])
+    to world coordinates x[:].
+    '''
+    assert p0.shape[0] == p1.shape[0] == p2.shape[0] == x.shape[0]
+    cdef DTYPE_t x1 = x[0]
+    cdef DTYPE_t x2 = x[1]
+    cdef Py_ssize_t i
+    for i in range(x.shape[0]):
+        x[i] = p0[i] + (p1[i] - p0[i]) * x1 + (p2[i] - p0[i]) * x2
+
+
 def in_triangle_2d(np.ndarray[DTYPE_t] p0,
                    np.ndarray[DTYPE_t] p1,
                    np.ndarray[DTYPE_t] p2,
@@ -159,8 +175,7 @@ cpdef int triangle_order(np.ndarray[DTYPE_t, ndim=2] t1, np.ndarray[DTYPE_t, ndi
     cdef Py_ssize_t i, j
     cdef DTYPE_t x1, x2, y1, y2, dy_dx, y_intersection
     cdef DTYPE_t sum1, sum2, diff1, diff2, sum_intersection, diff
-    cdef np.ndarray[DTYPE_t, ndim=2] res = np.zeros((2, 1), dtype=DTYPE)
-    cdef np.ndarray[DTYPE_t, ndim=2] result_projected
+    cdef np.ndarray[DTYPE_t] intersection = np.zeros(3, dtype=DTYPE)
     for i in range(nvertices):
         for j in range(2):
             x1 = coords[1-j, i]
@@ -176,11 +191,11 @@ cpdef int triangle_order(np.ndarray[DTYPE_t, ndim=2] t1, np.ndarray[DTYPE_t, ndi
             if not (0 < y_intersection and y_intersection < 1):
                 continue
 
-            res[j, 0] = y_intersection
-            res[1-j, 0] = 0
-            result_projected = unproject_affine_3d(t1[0], t1[1], t1[2], res)
-            diff = (result_projected[2] -
-                    linear_interpolation_2d_single(t2, result_projected[0], result_projected[1]))
+            intersection[j] = y_intersection
+            intersection[1-j] = 0
+            unproject_affine_3d_inplace(t1[0], t1[1], t1[2], intersection)
+            diff = (intersection[2] -
+                    linear_interpolation_2d_single(t2, intersection[0], intersection[1]))
             if not isclose(diff, 0):
                 return ABOVE if diff > 0 else BELOW
 
@@ -201,11 +216,11 @@ cpdef int triangle_order(np.ndarray[DTYPE_t, ndim=2] t1, np.ndarray[DTYPE_t, ndi
         if not (-1 < sum_intersection and sum_intersection < 1):
             continue
 
-        res[0, 0] = (sum_intersection + 1)/2
-        res[1, 0] = (1 - sum_intersection)/2
-        result_projected = unproject_affine_3d(t1[0], t1[1], t1[2], res)
-        diff = (result_projected[2] -
-                linear_interpolation_2d_single(t2, result_projected[0], result_projected[1]))
+        intersection[0] = (sum_intersection + 1)/2
+        intersection[1] = (1 - sum_intersection)/2
+        unproject_affine_3d_inplace(t1[0], t1[1], t1[2], intersection)
+        diff = (intersection[2] -
+                linear_interpolation_2d_single(t2, intersection[0], intersection[1]))
         if not isclose(diff, 0):
             return ABOVE if diff > 0 else BELOW
 
@@ -215,11 +230,12 @@ cpdef int triangle_order(np.ndarray[DTYPE_t, ndim=2] t1, np.ndarray[DTYPE_t, ndi
         d = float_min(float_min(c0, coords[0, i]), coords[1, i])
         if isclose(d, 0) or d < 0:
             continue
-        res = coords[:, i].reshape(2, 1)
 
-        result_projected = unproject_affine_3d(t1[0], t1[1], t1[2], res)
-        diff = (result_projected[2] -
-                linear_interpolation_2d_single(t2, result_projected[0], result_projected[1]))
+        intersection[:2] = coords[:, i]
+        unproject_affine_3d_inplace(t1[0], t1[1], t1[2], intersection)
+        diff = (intersection[2] -
+                linear_interpolation_2d_single(t2, intersection[0], intersection[1]))
+
         if not isclose(diff, 0):
             return ABOVE if diff > 0 else BELOW
 
