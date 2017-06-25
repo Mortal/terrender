@@ -6,6 +6,7 @@ import math
 
 DTYPE = np.float64
 ctypedef np.float64_t DTYPE_t
+DEF DTYPE_ERR = -1e38
 
 
 DEF ABOVE = 1
@@ -92,10 +93,10 @@ def unproject_affine_3d(np.ndarray[DTYPE_t] p0,
     return unproject_affine(p0, p1, p2, coords, 3)
 
 
-cdef void unproject_affine_3d_inplace(np.ndarray[DTYPE_t] p0,
-                                      np.ndarray[DTYPE_t] p1,
-                                      np.ndarray[DTYPE_t] p2,
-                                      np.ndarray[DTYPE_t] x):
+cdef int unproject_affine_3d_inplace(np.ndarray[DTYPE_t] p0,
+                                     np.ndarray[DTYPE_t] p1,
+                                     np.ndarray[DTYPE_t] p2,
+                                     np.ndarray[DTYPE_t] x) except -1:
     '''
     Given triangle p0p1p2, convert local coordinates (x[0], x[1])
     to world coordinates x[:].
@@ -106,6 +107,7 @@ cdef void unproject_affine_3d_inplace(np.ndarray[DTYPE_t] p0,
     cdef Py_ssize_t i
     for i in range(x.shape[0]):
         x[i] = p0[i] + (p1[i] - p0[i]) * x1 + (p2[i] - p0[i]) * x2
+    return 0
 
 
 def in_triangle_2d(np.ndarray[DTYPE_t] p0,
@@ -131,7 +133,7 @@ cdef inline DTYPE_t float_min(DTYPE_t a, DTYPE_t b): return a if a <= b else b
 
 
 cpdef DTYPE_t linear_interpolation_2d_single(np.ndarray[DTYPE_t, ndim=2] triangle,
-                                             DTYPE_t x, DTYPE_t y):
+                                             DTYPE_t x, DTYPE_t y) except DTYPE_ERR:
     cdef np.ndarray[DTYPE_t] coords = np.array([x, y, 0])
     project_affine_2d_inplace(triangle[0, :2], triangle[1, :2], triangle[2, :2], coords[:2].reshape(2, 1))
     unproject_affine_3d_inplace(triangle[0], triangle[1], triangle[2], coords)
@@ -160,7 +162,7 @@ cdef inline int isclose(DTYPE_t a, DTYPE_t b):
     return absdiff <= atol + rtol * abs(b)
 
 
-cpdef int triangle_order(np.ndarray[DTYPE_t, ndim=2] t1, np.ndarray[DTYPE_t, ndim=2] t2):
+cpdef int triangle_order(np.ndarray[DTYPE_t, ndim=2] t1, np.ndarray[DTYPE_t, ndim=2] t2) except -1:
     cdef Py_ssize_t nvertices = 3
     cdef Py_ssize_t ndim = t1.shape[1]
     assert t1.shape[0] == t2.shape[0] == nvertices
