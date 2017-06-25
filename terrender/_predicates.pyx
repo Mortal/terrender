@@ -126,6 +126,13 @@ def bbox_disjoint_2d(np.ndarray t1, np.ndarray t2):
     return not (o[0] and o[1])
 
 
+cdef inline int isclose(DTYPE_t a, DTYPE_t b):
+    cdef DTYPE_t absdiff = float_max(a, b) - float_min(a, b)
+    cdef DTYPE_t atol = 1.e-8
+    cdef DTYPE_t rtol = 1.e-5
+    return absdiff <= atol + rtol * abs(b)
+
+
 def triangle_order(t1, t2):
     assert t1.ndim == t2.ndim == 2
     nvertices, ndim = t1.shape[0], t1.shape[1]
@@ -140,12 +147,15 @@ def triangle_order(t1, t2):
 
     coords = project_affine_2d_inplace(t1[0, :2], t1[1, :2], t1[2, :2], np.array(t2[:, :2].T))
     assert coords.ndim == 2 and coords.shape[0] == 2 and coords.shape[1] == 3
-    # d = in_triangle_2d_coords(coords)
-    # assert d.ndim == 1 and d.shape[0] == nvertices
 
     if bbox_disjoint_2d(t1, t2):
         return DISJOINT
 
+    cdef Py_ssize_t i, j
+    cdef DTYPE_t x1, x2, y1, y2, dy_dx, y_intersection
+    cdef DTYPE_t sum1, sum2, diff1, diff2, sum_intersection, diff
+    cdef np.ndarray[DTYPE_t, ndim=2] res = np.zeros((2, 1), dtype=DTYPE)
+    cdef np.ndarray[DTYPE_t, ndim=2] result_projected
     for i in range(nvertices):
         for j in range(2):
             x1 = coords[1-j, i]
@@ -154,19 +164,19 @@ def triangle_order(t1, t2):
                 continue
             y1 = coords[j, i]
             y2 = coords[j, (1 + i) % nvertices]
-            if np.isclose(x1, x2):
+            if isclose(x1, x2):
                 continue
             dy_dx = (y2 - y1) / (x2 - x1)
             y_intersection = y1 - dy_dx * x1
             if not (0 < y_intersection and y_intersection < 1):
                 continue
 
-            res = np.zeros((2, 1))
             res[j, 0] = y_intersection
+            res[1-j, 0] = 0
             result_projected = unproject_affine_3d(t1[0], t1[1], t1[2], res)
             diff = (result_projected[2] -
                     linear_interpolation_2d_single(t2, result_projected[0], result_projected[1]))
-            if not np.isclose(diff, 0):
+            if not isclose(diff, 0):
                 return ABOVE if diff > 0 else BELOW
 
         x1 = coords[0, i]
@@ -179,32 +189,32 @@ def triangle_order(t1, t2):
         sum2, diff2 = x2 + y2 - 1, x2 - y2
         if not (float_min(sum1, sum2) < 0 and 0 < float_max(sum1, sum2)):
             continue
-        if np.isclose(sum1, sum2):
+        if isclose(sum1, sum2):
             continue
         dy_dx = (diff2 - diff1) / (sum2 - sum1)
         sum_intersection = diff1 - dy_dx * sum1
         if not (-1 < sum_intersection and sum_intersection < 1):
             continue
 
-        res = np.array([[(sum_intersection + 1)/2],
-                        [(1 - sum_intersection)/2]])
+        res[0, 0] = (sum_intersection + 1)/2
+        res[1, 0] = (1 - sum_intersection)/2
         result_projected = unproject_affine_3d(t1[0], t1[1], t1[2], res)
         diff = (result_projected[2] -
                 linear_interpolation_2d_single(t2, result_projected[0], result_projected[1]))
-        if not np.isclose(diff, 0):
+        if not isclose(diff, 0):
             return ABOVE if diff > 0 else BELOW
 
     for i in range(nvertices):
         c0 = 1 - coords[0, i] - coords[1, i]
         d = float_min(float_min(c0, coords[0, i]), coords[1, i])
-        if np.isclose(d, 0) or d < 0:
+        if isclose(d, 0) or d < 0:
             continue
         res = coords[:, i].reshape(2, 1)
 
         result_projected = unproject_affine_3d(t1[0], t1[1], t1[2], res)
         diff = (result_projected[2] -
                 linear_interpolation_2d_single(t2, result_projected[0], result_projected[1]))
-        if not np.isclose(diff, 0):
+        if not isclose(diff, 0):
             return ABOVE if diff > 0 else BELOW
 
     return DISJOINT
