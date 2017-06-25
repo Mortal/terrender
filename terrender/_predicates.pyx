@@ -53,10 +53,11 @@ def change_basis_2d_inplace(np.ndarray[DTYPE_t] p1, np.ndarray[DTYPE_t] p2, np.n
     return x
 
 
-def project_affine_2d_inplace(np.ndarray[DTYPE_t] p0,
-                              np.ndarray[DTYPE_t] p1,
-                              np.ndarray[DTYPE_t] p2,
-                              np.ndarray[DTYPE_t, ndim=2] x):
+cpdef np.ndarray[DTYPE_t, ndim=2] project_affine_2d_inplace(
+    np.ndarray[DTYPE_t] p0,
+    np.ndarray[DTYPE_t] p1,
+    np.ndarray[DTYPE_t] p2,
+    np.ndarray[DTYPE_t, ndim=2] x):
     cdef Py_ssize_t d = x.shape[0]
     cdef Py_ssize_t n = x.shape[1]
     assert d == p0.shape[0] == p1.shape[0] == p2.shape[0] == 2
@@ -91,8 +92,12 @@ def unproject_affine_3d(np.ndarray[DTYPE_t] p0,
     return unproject_affine(p0, p1, p2, coords, 3)
 
 
-def in_triangle_2d(np.ndarray p0, np.ndarray p1, np.ndarray p2, np.ndarray x):
-    coords = project_affine_2d_inplace(p0, p1, p2, np.array(x))
+def in_triangle_2d(np.ndarray[DTYPE_t] p0,
+                   np.ndarray[DTYPE_t] p1,
+                   np.ndarray[DTYPE_t] p2,
+                   np.ndarray[DTYPE_t, ndim=2] x):
+    cdef np.ndarray[DTYPE_t, ndim=2] coords = np.array(x)
+    project_affine_2d_inplace(p0, p1, p2, coords)
     return in_triangle_2d_coords(coords)
 
 
@@ -110,8 +115,8 @@ cdef inline DTYPE_t float_min(DTYPE_t a, DTYPE_t b): return a if a <= b else b
 
 
 def linear_interpolation_2d_single(triangle, x, y):
-    xy = np.array([x, y]).reshape(2, 1)
-    coords = project_affine_2d_inplace(triangle[0, :2], triangle[1, :2], triangle[2, :2], xy)
+    cdef np.ndarray[DTYPE_t, ndim=2] coords = np.array([x, y]).reshape(2, 1)
+    project_affine_2d_inplace(triangle[0, :2], triangle[1, :2], triangle[2, :2], coords)
     res = unproject_affine_3d(triangle[0], triangle[1], triangle[2], coords)
     assert res.ndim == 2 and res.shape[0] == 3 and res.shape[1] == 1
     return res[2, 0]
