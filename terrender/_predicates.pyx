@@ -132,11 +132,10 @@ cdef inline DTYPE_t float_min(DTYPE_t a, DTYPE_t b): return a if a <= b else b
 
 cpdef DTYPE_t linear_interpolation_2d_single(np.ndarray[DTYPE_t, ndim=2] triangle,
                                              DTYPE_t x, DTYPE_t y):
-    cdef np.ndarray[DTYPE_t, ndim=2] coords = np.array([x, y]).reshape(2, 1)
-    project_affine_2d_inplace(triangle[0, :2], triangle[1, :2], triangle[2, :2], coords)
-    res = unproject_affine_3d(triangle[0], triangle[1], triangle[2], coords)
-    assert res.ndim == 2 and res.shape[0] == 3 and res.shape[1] == 1
-    return res[2, 0]
+    cdef np.ndarray[DTYPE_t] coords = np.array([x, y, 0])
+    project_affine_2d_inplace(triangle[0, :2], triangle[1, :2], triangle[2, :2], coords[:2].reshape(2, 1))
+    unproject_affine_3d_inplace(triangle[0], triangle[1], triangle[2], coords)
+    return coords[2]
 
 
 cdef int bbox_disjoint_2d(np.ndarray[DTYPE_t, ndim=2] t1, np.ndarray[DTYPE_t, ndim=2] t2):
