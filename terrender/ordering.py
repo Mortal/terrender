@@ -42,7 +42,10 @@ def triangle_order(t1, t2, output: 'IpeOutput'=None):
             else SpaceOrder.disjoint)
 
 
-def z_order(faces, output: 'IpeOutput'=None):
+DEBUG_OUTPUT = None
+
+
+def order_overlapping_triangles(faces):
     faces = np.asarray(faces)
     n, k, d = faces.shape
     assert k == 3  # Triangles
@@ -70,11 +73,11 @@ def z_order(faces, output: 'IpeOutput'=None):
     before = {}
 
     for i1, i2 in zip(i1s, i2s):
-        o = triangle_order(faces[i1], faces[i2], output)
-        o2 = triangle_order(faces[i2], faces[i1], output).flip()
+        o = triangle_order(faces[i1], faces[i2])
+        o2 = triangle_order(faces[i2], faces[i1]).flip()
         if o != o.flip() == o2:
-            if output is not None:
-                with output.open_page() as page:
+            if DEBUG_OUTPUT is not None:
+                with DEBUG_OUTPUT.open_page() as page:
                     page.face(faces[i1])
                     page.face(faces[i2])
                     for x, y, z, *w in faces[i1].tolist() + faces[i2].tolist():
@@ -85,6 +88,13 @@ def z_order(faces, output: 'IpeOutput'=None):
         elif SpaceOrder.above in (o, o2):
             before.setdefault(i1, []).append(i2)
 
+    return before
+
+
+def z_order(faces):
+    faces = np.asarray(faces)
+    n = len(faces)
+    before = order_overlapping_triangles(faces)
     # print(before)
 
     state = np.zeros(n)
