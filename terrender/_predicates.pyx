@@ -251,14 +251,17 @@ cpdef int triangle_order(np.ndarray[DTYPE_t, ndim=2] t1, np.ndarray[DTYPE_t, ndi
 
 def order_overlapping_triangles(np.ndarray faces):
     assert faces.ndim == 3
+    cdef Py_ssize_t n, k, d
     n, k, d = faces.shape[0], faces.shape[1], faces.shape[2]
     assert k == 3  # Triangles
     if d != 3:
         assert d == 4  # Homogenous 3D coordinates
         assert np.allclose(faces[:, :, 3], 1)  # Normalized
 
-    output_size = 0
-    output_buffer = np.zeros((n*(n-1)//2, 2), dtype=np.intp)
+    cdef Py_ssize_t output_size = 0
+    cdef np.ndarray[Py_ssize_t, ndim=2] output_buffer = np.zeros((n*(n-1)//2, 2), dtype=np.intp)
+    cdef Py_ssize_t i1, i2
+    cdef int o1, o2
     for i1 in range(n):
         for i2 in range(i1+1, n):
             o1 = triangle_order(faces[i1], faces[i2])
