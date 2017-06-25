@@ -159,29 +159,22 @@ def z_order(faces):
 
     before = {}
 
-    with open_multipage_writer('z_order.ipe') as open_page:
-        for i1, i2 in zip(i1s, i2s):
+    for i1, i2 in zip(i1s, i2s):
+        o = triangle_order(faces[i1], faces[i2],
+                           )
+        o2 = triangle_order(faces[i2], faces[i1],
+                            ).flip()
+        if o != o.flip() == o2:
             with open_page() as write:
                 write_face(write, faces[i1])
                 write_face(write, faces[i2])
-                o = triangle_order(faces[i1], faces[i2],
-                                   functools.partial(write_label, write))
-            with open_page() as write:
-                write_face(write, faces[i2])
-                write_face(write, faces[i1])
-                o2 = triangle_order(faces[i2], faces[i1],
-                                    functools.partial(write_label, write)).flip()
-            if o != o.flip() == o2:
-                with open_page() as write:
-                    write_face(write, faces[i1])
-                    write_face(write, faces[i2])
-                    for x, y, z, *w in faces[i1].tolist() + faces[i2].tolist():
-                        write_label(write, x, y, '%g' % z)
-                raise AssertionError('inversion')
-            if SpaceOrder.below in (o, o2):
-                before.setdefault(i2, []).append(i1)
-            elif SpaceOrder.above in (o, o2):
-                before.setdefault(i1, []).append(i2)
+                for x, y, z, *w in faces[i1].tolist() + faces[i2].tolist():
+                    write_label(write, x, y, '%g' % z)
+            # raise AssertionError('inversion')
+        if SpaceOrder.below in (o, o2):
+            before.setdefault(i2, []).append(i1)
+        elif SpaceOrder.above in (o, o2):
+            before.setdefault(i1, []).append(i2)
 
     # print(before)
 
@@ -302,7 +295,7 @@ def main():
     #     output_faces(write, project_ortho(t, 0.1, 0))
     with open_multipage_writer('side-ortho.ipe') as open_page:
         n = 50
-        for i in range(15, 16):
+        for i in range(n):
             with open_page() as write:
                 output_faces(write, project_ortho(t, 0, 2*np.pi*i/n))
 
