@@ -140,8 +140,8 @@ def triangle_order(t1, t2):
 
     coords = project_affine_2d_inplace(t1[0, :2], t1[1, :2], t1[2, :2], np.array(t2[:, :2].T))
     assert coords.ndim == 2 and coords.shape[0] == 2 and coords.shape[1] == 3
-    d = in_triangle_2d_coords(coords)
-    assert d.ndim == 1 and d.shape[0] == nvertices
+    # d = in_triangle_2d_coords(coords)
+    # assert d.ndim == 1 and d.shape[0] == nvertices
 
     if bbox_disjoint_2d(t1, t2):
         return DISJOINT
@@ -195,7 +195,9 @@ def triangle_order(t1, t2):
             return ABOVE if diff > 0 else BELOW
 
     for i in range(nvertices):
-        if np.isclose(d[i], 0) or d[i] < 0:
+        c0 = 1 - coords[0, i] - coords[1, i]
+        d = float_min(float_min(c0, coords[0, i]), coords[1, i])
+        if np.isclose(d, 0) or d < 0:
             continue
         res = coords[:, i].reshape(2, 1)
 
