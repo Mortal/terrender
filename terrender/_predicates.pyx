@@ -256,7 +256,9 @@ def order_overlapping_triangles(np.ndarray[DTYPE_t, ndim=3] faces):
     cdef Py_ssize_t i1, i2
     cdef int o
     for i1 in range(n):
-        for i2 in range(i1+1, n):
+        for i2 in range(n):
+            if i1 == i2:
+                continue
             o = triangle_order(faces[i1], faces[i2])
             if o == DISJOINT:
                 continue
