@@ -8,6 +8,11 @@ DTYPE = np.float64
 ctypedef np.float64_t DTYPE_t
 
 
+ABOVE = 1
+BELOW = 2
+DISJOINT = 3
+
+
 def rot_4d_xy(angle):
     s_angle = math.sin(angle)
     c_angle = math.cos(angle)
@@ -55,8 +60,6 @@ def project_affine_2d(np.ndarray p0, np.ndarray p1, np.ndarray p2, np.ndarray x)
     assert p0.ndim == p1.ndim == p2.ndim == 1
     assert p0.shape[0] == p1.shape[0] == p2.shape[0] == 2
     coords = change_basis_2d(p1 - p0, p2 - p0, x - p0.reshape(d, 1))
-    x2 = unproject_affine_2d(p0, p1, p2, coords)
-    assert np.allclose(x2, x), (x, x2)
     return coords
 
 
@@ -165,3 +168,94 @@ def triangle_intersection_2d_coords(np.ndarray coords):
         result.append(coords[:, i, :])
 
     return np.array(result), np.array(intersects)
+
+
+cdef inline DTYPE_t float_max(DTYPE_t a, DTYPE_t b): return a if a >= b else b
+cdef inline DTYPE_t float_min(DTYPE_t a, DTYPE_t b): return a if a <= b else b
+
+
+def linear_interpolation_2d_single(triangle, x, y):
+    xy = np.array([x, y]).reshape(2, 1)
+    coords = project_affine_2d(triangle[0, :2], triangle[1, :2], triangle[2, :2], xy)
+    res = unproject_affine_3d(triangle[0], triangle[1], triangle[2], coords)
+    assert res.ndim == 2 and res.shape[0] == 3 and res.shape[1] == 1
+    return res[2, 0]
+
+
+def triangle_order(t1, t2):
+    assert t1.ndim == t2.ndim == 2
+    nvertices, ndim = t1.shape[0], t1.shape[1]
+    nvertices_, ndim_ = t2.shape[0], t2.shape[1]
+    assert nvertices == nvertices_ == 3
+    assert ndim == ndim_
+    if ndim != 3:
+        assert ndim == 4  # Homogenous 3D coordinates
+        assert np.allclose([t1[:, 3], t2[:, 3]], 1)  # Normalized
+        t1 = t1[:, :3]
+        t2 = t2[:, :3]
+
+    coords = project_affine_2d(t1[0, :2], t1[1, :2], t1[2, :2], t2[:, :2].T)
+    assert coords.ndim == 2 and coords.shape[0] == 2 and coords.shape[1] == 3
+    d = in_triangle_2d_coords(coords)
+    assert d.ndim == 1 and d.shape[0] == nvertices
+
+    for i in range(nvertices):
+        for j in range(2):
+            x1 = coords[1-j, i]
+            x2 = coords[1-j, (1 + i) % nvertices]
+            if not (float_min(x1, x2) < 0 and 0 < float_max(x1, x2)):
+                continue
+            y1 = coords[j, i]
+            y2 = coords[j, (1 + i) % nvertices]
+            if np.isclose(x1, x2):
+                continue
+            dy_dx = (y2 - y1) / (x2 - x1)
+            y_intersection = y1 - dy_dx * x1
+            if not (0 < y_intersection and y_intersection < 1):
+                continue
+
+            res = np.zeros((2, 1))
+            res[j, 0] = y_intersection
+            result_projected = unproject_affine_3d(t1[0], t1[1], t1[2], res)
+            diff = (result_projected[2] -
+                    linear_interpolation_2d_single(t2, result_projected[0], result_projected[1]))
+            if not np.isclose(diff, 0):
+                return ABOVE if diff > 0 else BELOW
+
+        x1 = coords[0, i]
+        x2 = coords[0, (1 + i) % nvertices]
+        y1 = coords[1, i]
+        y2 = coords[1, (1 + i) % nvertices]
+        # Consider the line segment on the line x+y=1
+        # where -1 < x-y < 1
+        sum1, diff1 = x1 + y1 - 1, x1 - y1
+        sum2, diff2 = x2 + y2 - 1, x2 - y2
+        if not (float_min(sum1, sum2) < 0 and 0 < float_max(sum1, sum2)):
+            continue
+        if np.isclose(sum1, sum2):
+            continue
+        dy_dx = (diff2 - diff1) / (sum2 - sum1)
+        sum_intersection = diff1 - dy_dx * sum1
+        if not (-1 < sum_intersection and sum_intersection < 1):
+            continue
+
+        res = np.array([[(sum_intersection + 1)/2],
+                        [(1 - sum_intersection)/2]])
+        result_projected = unproject_affine_3d(t1[0], t1[1], t1[2], res)
+        diff = (result_projected[2] -
+                linear_interpolation_2d_single(t2, result_projected[0], result_projected[1]))
+        if not np.isclose(diff, 0):
+            return ABOVE if diff > 0 else BELOW
+
+    for i in range(nvertices):
+        if np.isclose(d[i], 0) or d[i] < 0:
+            continue
+        res = coords[:, i].reshape(2, 1)
+
+        result_projected = unproject_affine_3d(t1[0], t1[1], t1[2], res)
+        diff = (result_projected[2] -
+                linear_interpolation_2d_single(t2, result_projected[0], result_projected[1]))
+        if not np.isclose(diff, 0):
+            return ABOVE if diff > 0 else BELOW
+
+    return DISJOINT

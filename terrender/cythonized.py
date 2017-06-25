@@ -35,6 +35,8 @@ def compare_results(path, fast, slow):
         raise DifferentResults(
             path, 'shape %r' % (fast.shape,), 'shape %r' % (slow.shape,))
     close = np.isclose(fast, slow)
+    if fast.ndim == 0 and not close:
+        raise DifferentResults(path, fast, slow)
     incorrect_flat = np.argmin(close.ravel())
     if close.ravel()[incorrect_flat]:
         return
