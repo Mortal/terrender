@@ -8,9 +8,9 @@ DTYPE = np.float64
 ctypedef np.float64_t DTYPE_t
 
 
-ABOVE = 1
-BELOW = 2
-DISJOINT = 3
+cdef int ABOVE = 1
+cdef int BELOW = 2
+cdef int DISJOINT = 3
 
 
 def rot_4d_xy(angle):
