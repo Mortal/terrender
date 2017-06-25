@@ -1,3 +1,5 @@
+import argparse
+import contextlib
 import numpy as np
 from terrender.terrain import Terrain
 from terrender.backends.ipe import IpeOutput
@@ -7,14 +9,16 @@ from terrender.ordering import z_order
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-m', '--matplotlib', action='store_true')
+    args = parser.parse_args()
+
     t = Terrain()
-    # with open_writer('top.ipe') as write:
-    #     faces = project_ortho(t, 0, 0)
-    #     draw.faces(write, z_order(faces), faces)
-    # with open_writer('top-rot.ipe') as write:
-    #     faces = project_ortho(t, 0.1, 0)
-    #     draw.faces(write, z_order(faces), faces)
-    with PlotOutput() as output:
+    with contextlib.ExitStack() as stack:
+        if args.matplotlib:
+            output = stack.enter_context(PlotOutput())
+        else:
+            output = stack.enter_context(IpeOutput('side-ortho.ipe'))
         n = 50
         for i in range(n):
             with output.open_page() as page:
