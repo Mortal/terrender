@@ -103,6 +103,17 @@ def change_basis_2d(p1, p2, x):
 
 
 @cythonized
+def project_affine_2d_inplace(p0, p1, p2, x):
+    p0, p1, p2 = np.asarray(p0), np.asarray(p1), np.asarray(p2)
+    x = np.asarray(x)
+    d, n = x.shape
+    assert p0.shape == p1.shape == p2.shape == (2,)
+    assert d == 2
+    x -= p0.reshape(d, 1)
+    coords = change_basis_2d_inplace(p1 - p0, p2 - p0, x)
+    return coords
+
+
 def project_affine_2d(p0, p1, p2, x):
     '''
     >>> print(project_affine_2d([0, 0], [1, 0], [0, 1], [[0], [0]]).T)
@@ -114,12 +125,7 @@ def project_affine_2d(p0, p1, p2, x):
     >>> print(project_affine_2d([1, 1], [1, 2], [2, 1], [[2], [3]]).T)
     [[ 2.  1.]]
     '''
-    p0, p1, p2 = np.asarray(p0), np.asarray(p1), np.asarray(p2)
-    x = np.asarray(x)
-    d, n = x.shape
-    assert p0.shape == p1.shape == p2.shape == (2,)
-    assert d == 2
-    coords = change_basis_2d(p1 - p0, p2 - p0, x - p0.reshape(d, 1))
+    coords = project_affine_2d_inplace(p0, p1, p2, np.array(x))
     x2 = unproject_affine_2d(p0, p1, p2, coords)
     assert np.allclose(x2, x), (x, x2)
     return coords

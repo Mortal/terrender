@@ -53,13 +53,13 @@ def change_basis_2d_inplace(np.ndarray[DTYPE_t] p1, np.ndarray[DTYPE_t] p2, np.n
     return x
 
 
-def project_affine_2d(np.ndarray[DTYPE_t] p0, np.ndarray[DTYPE_t] p1, np.ndarray[DTYPE_t] p2, np.ndarray[DTYPE_t, ndim=2] x):
+def project_affine_2d_inplace(np.ndarray[DTYPE_t] p0, np.ndarray[DTYPE_t] p1, np.ndarray[DTYPE_t] p2, np.ndarray[DTYPE_t, ndim=2] x):
     cdef Py_ssize_t d = x.shape[0]
     cdef Py_ssize_t n = x.shape[1]
     assert d == p0.shape[0] == p1.shape[0] == p2.shape[0] == 2
-    cdef np.ndarray[DTYPE_t, ndim=2] coords
-    coords = change_basis_2d_inplace(p1 - p0, p2 - p0, x - p0.reshape(d, 1))
-    return coords
+    x -= p0.reshape(d, 1)
+    change_basis_2d_inplace(p1 - p0, p2 - p0, x)
+    return x
 
 
 def unproject_affine(np.ndarray p0, np.ndarray p1, np.ndarray p2, np.ndarray coords, int ndim):
@@ -81,7 +81,7 @@ def unproject_affine_3d(np.ndarray p0, np.ndarray p1, np.ndarray p2, np.ndarray 
 
 
 def in_triangle_2d(np.ndarray p0, np.ndarray p1, np.ndarray p2, np.ndarray x):
-    coords = project_affine_2d(p0, p1, p2, x)
+    coords = project_affine_2d_inplace(p0, p1, p2, np.array(x))
     return in_triangle_2d_coords(coords)
 
 
@@ -175,7 +175,7 @@ cdef inline DTYPE_t float_min(DTYPE_t a, DTYPE_t b): return a if a <= b else b
 
 def linear_interpolation_2d_single(triangle, x, y):
     xy = np.array([x, y]).reshape(2, 1)
-    coords = project_affine_2d(triangle[0, :2], triangle[1, :2], triangle[2, :2], xy)
+    coords = project_affine_2d_inplace(triangle[0, :2], triangle[1, :2], triangle[2, :2], xy)
     res = unproject_affine_3d(triangle[0], triangle[1], triangle[2], coords)
     assert res.ndim == 2 and res.shape[0] == 3 and res.shape[1] == 1
     return res[2, 0]
@@ -202,7 +202,7 @@ def triangle_order(t1, t2):
         t1 = t1[:, :3]
         t2 = t2[:, :3]
 
-    coords = project_affine_2d(t1[0, :2], t1[1, :2], t1[2, :2], t2[:, :2].T)
+    coords = project_affine_2d_inplace(t1[0, :2], t1[1, :2], t1[2, :2], np.array(t2[:, :2].T))
     assert coords.ndim == 2 and coords.shape[0] == 2 and coords.shape[1] == 3
     d = in_triangle_2d_coords(coords)
     assert d.ndim == 1 and d.shape[0] == nvertices
