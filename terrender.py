@@ -15,7 +15,7 @@ APP_NAME = 'terrender'
 
 
 class Terrain:
-    def __init__(self, n=10, seed=2):
+    def __init__(self, n=20, seed=2):
         rng = np.random.RandomState(seed)
         corners = np.array([
             [-2, -3],
@@ -113,7 +113,7 @@ class SpaceOrder(enum.Enum):
         return cls.above if sign > 0 else cls.below
 
 
-def triangle_order(t1, t2, debug=None):
+def triangle_order(t1, t2, open_page=None):
     nvertices, ndim = t1.shape
     assert t1.shape == t2.shape
     assert nvertices == 3, t1.shape  # Triangles
@@ -126,13 +126,17 @@ def triangle_order(t1, t2, debug=None):
         t1[0], t1[1], t1[2], t2[:, :, np.newaxis])
     # print(d, b)
     proper_overlap = b and not np.isclose(d, 0)
-    if debug is not None:
-        debug(x, y, '%.0g' % d if proper_overlap else 'D')
+
+    if open_page is not None:
+        with open_page() as write:
+            write_face(write, t1)
+            write_face(write, t2)
+            write_label(write, x, y, '%.0g' % d if proper_overlap else 'D')
     return (SpaceOrder.from_sign(d) if proper_overlap
             else SpaceOrder.disjoint)
 
 
-def z_order(faces):
+def z_order(faces, open_page=None):
     faces = np.asarray(faces)
     n, k, d = faces.shape
     assert k == 3  # Triangles
@@ -150,8 +154,8 @@ def z_order(faces):
     # Don't overlap with self
     b_overlap &= ~np.eye(n, dtype=bool).reshape(n, n, 1)
 
-    # Require overlap in all dimensions
-    b_overlap = np.all(b_overlap, axis=2)
+    # Require overlap in first two dimensions
+    b_overlap = np.all(b_overlap[:, :, :2], axis=2)
     i1s, i2s = b_overlap.nonzero()
     # Since both (i1, i2) and (i2, i1) overlap, only keep (i < j)-pairs
     dup = i1s < i2s
@@ -160,17 +164,16 @@ def z_order(faces):
     before = {}
 
     for i1, i2 in zip(i1s, i2s):
-        o = triangle_order(faces[i1], faces[i2],
-                           )
-        o2 = triangle_order(faces[i2], faces[i1],
-                            ).flip()
+        o = triangle_order(faces[i1], faces[i2], open_page)
+        o2 = triangle_order(faces[i2], faces[i1], open_page).flip()
         if o != o.flip() == o2:
-            with open_page() as write:
-                write_face(write, faces[i1])
-                write_face(write, faces[i2])
-                for x, y, z, *w in faces[i1].tolist() + faces[i2].tolist():
-                    write_label(write, x, y, '%g' % z)
-            # raise AssertionError('inversion')
+            if open_page is not None:
+                with open_page() as write:
+                    write_face(write, faces[i1])
+                    write_face(write, faces[i2])
+                    for x, y, z, *w in faces[i1].tolist() + faces[i2].tolist():
+                        write_label(write, x, y, '%g' % z)
+            raise AssertionError('inversion')
         if SpaceOrder.below in (o, o2):
             before.setdefault(i2, []).append(i1)
         elif SpaceOrder.above in (o, o2):
