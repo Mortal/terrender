@@ -1,3 +1,6 @@
+import numpy as np
+
+
 def on_segment(p, q, r):
     """Given collinear p, q, r, does q lie on pr?
 
@@ -80,3 +83,224 @@ def intersects(p1, q1, p2, q2):
     res[o4 == 0] |= on_segment(p2, q1, q2).T[o4 == 0]
     res[~special] = ((o1 != o2) & (o3 != o4))[~special]
     return res.reshape(s1 + s2)
+
+
+def change_basis_2d(p1, p2, x):
+    p1, p2, x = np.asarray(p1), np.asarray(p2), np.asarray(x)
+    assert p1.shape == p2.shape == (2,)
+    assert 1 <= x.ndim <= 2
+    assert x.shape[0] == 2
+    c = np.linalg.inv(np.c_[p1, p2]) @ x
+    assert np.allclose(np.c_[p1, p2] @ c, x)
+    return c
+
+
+def project_affine_2d(p0, p1, p2, x):
+    '''
+    >>> print(project_affine_2d([0, 0], [1, 0], [0, 1], [[0], [0]]).T)
+    [[ 0.  0.]]
+    >>> print(project_affine_2d([0, 0], [1, 0], [0, 1], [[1], [2]]).T)
+    [[ 1.  2.]]
+    >>> print(project_affine_2d([0, 0], [0, 1], [1, 0], [[1], [2]]).T)
+    [[ 2.  1.]]
+    >>> print(project_affine_2d([1, 1], [1, 2], [2, 1], [[2], [3]]).T)
+    [[ 2.  1.]]
+    '''
+    p0, p1, p2 = np.asarray(p0), np.asarray(p1), np.asarray(p2)
+    x = np.asarray(x)
+    d, n = x.shape
+    assert p0.shape == p1.shape == p2.shape == (2,)
+    assert d == 2
+    coords = change_basis_2d(p1 - p0, p2 - p0, x - p0.reshape(d, 1))
+    x2 = unproject_affine_2d(p0, p1, p2, coords)
+    assert np.allclose(x2, x), (x, x2)
+    return coords
+
+
+# def unproject_affine_batch(p0, p1, p2, coords):
+#     p0, p1, p2 = np.asarray(p0), np.asarray(p1), np.asarray(p2)
+#     coords = np.asarray(coords)
+#     assert p0.shape == p1.shape == p2.shape
+#     assert p0.shape[1:] == coords.shape[1:]
+#     return p0 + p1 * coords[0:1] + p2 * coords[1:2]
+
+
+def unproject_affine(p0, p1, p2, coords, ndim):
+    p0, p1, p2 = np.asarray(p0), np.asarray(p1), np.asarray(p2)
+    coords = np.asarray(coords)
+    assert p0.shape == p1.shape == p2.shape == (ndim,)
+    assert coords.shape[0] == 2
+    coords_shape = coords.shape
+    result_shape = (ndim,) + coords_shape[1:]
+    coords = coords.reshape(2, -1)
+    return (p0.reshape(ndim, 1) +
+            (p1-p0).reshape(ndim, 1) * coords[0:1] +
+            (p2-p0).reshape(ndim, 1) * coords[1:2]).reshape(result_shape)
+
+
+def unproject_affine_2d(p0, p1, p2, coords):
+    return unproject_affine(p0, p1, p2, coords, ndim=2)
+
+
+def unproject_affine_3d(p0, p1, p2, coords):
+    return unproject_affine(p0, p1, p2, coords, ndim=3)
+
+
+def in_triangle_2d(p0, p1, p2, x):
+    '''
+    Returns >0 for in triangle, 0 for boundary, <0 for out of triangle.
+    '''
+    coords = project_affine_2d(p0, p1, p2, x)
+    return in_triangle_2d_coords(coords)
+
+
+def in_triangle_2d_coords(coords):
+    '''
+    Helper for in_triangle_2d.
+    '''
+    assert coords.shape[0] == 2
+    c0 = 1 - coords.sum(axis=0)
+    return np.minimum(c0, coords.min(axis=0))
+
+
+def triangle_intersection_2d(p0, p1, p2, xs):
+    '''
+    Given a single triangle p0p1p2 and a number of triangles,
+    determine which triangles intersect p0p1p2
+    and a common point in their intersection.
+
+    Parameters:
+
+    p0, p1, p2: (2,) array of float
+    xs: (3, 2, n) array of float
+
+    Returns:
+
+    p: (2, n) array of float
+    b: (n,) array of bool
+    '''
+    p0, p1, p2 = np.asarray(p0), np.asarray(p1), np.asarray(p2)
+    xs = np.asarray(xs)
+    assert p0.shape == p1.shape == p2.shape == (2,)
+    nvertices, ndim, n = xs.shape
+    assert nvertices == 3  # Triangles
+    assert ndim == 2  # in the plane
+
+    xs_flat = np.swapaxes(xs, 0, 1).reshape(ndim, nvertices*n)
+
+    coords_flat = project_affine_2d(p0, p1, p2, xs_flat)
+    assert coords_flat.shape == (ndim, nvertices*n)
+    coords = coords_flat.reshape(ndim, nvertices, n)
+
+    result, intersects = triangle_intersection_2d_coords(coords)
+    TODO
+
+    result_projected = unproject_affine_2d(p0, p1, p2, result)
+
+    return result_projected, intersects
+
+
+def triangle_intersection_2d_coords(coords):
+    ndim, nvertices, n = coords.shape
+    coords_flat = coords.reshape(ndim, nvertices*n)
+    d = in_triangle_2d_coords(coords_flat).reshape(nvertices, n)
+
+    d_sign = d >= 0
+
+    # intersects = np.zeros(n, dtype=bool)
+    # result = np.zeros((ndim, n))
+    intersects = []
+    result = []
+    for i in range(nvertices):
+        for j in range(ndim):
+            x1 = coords[1-j, i, :]
+            x2 = coords[1-j, (1 + i) % nvertices, :]
+            y1 = coords[j, i, :]
+            y2 = coords[j, (1 + i) % nvertices, :]
+            has_y_intersection = ~np.isclose(x1, x2)
+            dy = y2 - y1
+            dy_dx = np.divide(dy, x2 - x1, out=dy, where=has_y_intersection)
+            # y - y1 = dy_dx * (x - x1)
+            # y_at_0 = y1 - dy_dx * x1
+            y_intersection = y1 - dy_dx * x1
+            b = (has_y_intersection &
+                 (np.minimum(x1, x2) < 0) &
+                 (0 < np.maximum(x1, x2)) &
+                 (0 < y_intersection) & (y_intersection < 1))
+            intersects.append(b)
+            r = np.zeros((ndim, n))
+            r[j, b] = y_intersection[b]
+            # r[1-j, b] = 0
+            result.append(r)
+    for i in range(nvertices):
+        vertex_inside = ~np.isclose(d[i], 0) & d_sign[i]
+        intersects.append(vertex_inside)
+        result.append(coords[:, i, :])
+
+    return np.array(result), np.array(intersects)
+
+
+def linear_interpolation_2d(triangles, x, y):
+    x, y = np.squeeze(x), np.squeeze(y)
+    assert x.ndim == y.ndim == 0
+    triangles = np.asarray(triangles)
+    nvertices, ndim, n = triangles.shape
+    assert nvertices == 3  # Triangles
+    assert ndim == 3  # in the plane
+    return np.array([linear_interpolation_2d_single(triangles[:, :, i], x, y)
+                     for i in range(n)])
+
+
+def linear_interpolation_2d_single(triangle, x, y):
+    xy = np.asarray([[x], [y]])
+    coords = project_affine_2d(*triangle[:, :2], xy)
+    res = unproject_affine_3d(*triangle, coords)
+    return res[2, 0]
+
+
+def triangle_order_3d(p0, p1, p2, xs):
+    p0, p1, p2 = np.asarray(p0), np.asarray(p1), np.asarray(p2)
+    xs = np.asarray(xs)
+    nvertices, ndim, n = xs.shape
+    assert nvertices == 3  # Triangles
+    assert ndim == 3  # in space
+    assert p0.shape == p1.shape == p2.shape == (ndim,)
+
+    xs_flat = np.swapaxes(xs, 0, 1).reshape(ndim, nvertices*n)
+
+    coords_flat = project_affine_2d(p0[:2], p1[:2], p2[:2], xs_flat[:2])
+    assert coords_flat.shape == (2, nvertices*n)
+    coords = coords_flat.reshape(2, nvertices, n)
+
+    result, intersects = triangle_intersection_2d_coords(coords)
+    m, n_ = intersects.shape
+    assert n == n_
+    assert result.shape == (m, 2, n), (result.shape, m, 2, n)
+
+    min_res = max_res = min_diff = max_diff = count = None
+    for i in range(m):
+
+        result_projected = unproject_affine_3d(p0, p1, p2, result[i])
+        diff = (result_projected[2] -
+                linear_interpolation_2d(xs, *result_projected[:2]))
+        b = intersects[i]
+        if i == 0:
+            min_diff = np.array(diff)
+            max_diff = np.array(diff)
+            min_res = np.array(result_projected[:2])
+            max_res = np.array(result_projected[:2])
+            count = b.astype(np.intp)
+        else:
+            is_min = ((diff < min_diff) | (count == 0)) & b
+            is_max = ((diff > max_diff) | (count == 0)) & b
+            min_res[:, is_min] = result_projected[:2, is_min]
+            min_diff[is_min] = diff[is_min]
+            max_res[:, is_max] = result_projected[:2, is_max]
+            max_diff[is_max] = diff[is_max]
+            count[b] += 1
+
+    min_is_abs = -min_diff > max_diff
+    max_diff[min_is_abs] = min_diff[min_is_abs]
+    max_res[:, min_is_abs] = min_res[:, min_is_abs]
+
+    return max_res, max_diff, (count > 0)
