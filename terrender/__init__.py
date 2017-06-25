@@ -1,3 +1,8 @@
+DESCRIPTION = '''\
+Render terrains to vector formats
+'''.rstrip('\n')
+
+
 import scipy.spatial
 import numpy as np
 import functools
