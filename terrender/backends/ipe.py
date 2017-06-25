@@ -6,18 +6,18 @@ class IpeOutputPage:
         assert self._parent._current_page is None
         print("Output page")
         self._parent._current_page = self
-        self._parent.write('<page>')
-        self._parent.write('<group matrix="256 0 0 256 288 688">')
+        self._parent._write('<page>')
+        self._parent._write('<group matrix="256 0 0 256 288 688">')
         return self
 
     def __exit__(self, typ, val, tb):
         assert self._parent._current_page is self
         self._parent._current_page = None
-        self._parent.write('</group>')
-        self._parent.write('</page>')
+        self._parent._write('</group>')
+        self._parent._write('</page>')
 
     def label(self, x, y, l):
-        write = self._parent.write
+        write = self._parent._write
         write('<group matrix="1 0 0 1 %.15f %.15f">' % (x, y))
         write('<path fill="1">')
         write('0 0 m')
@@ -33,7 +33,7 @@ class IpeOutputPage:
         write('</group>')
 
     def face(self, face, fill='1'):
-        write = self._parent.write
+        write = self._parent._write
         write('<path stroke="0" fill="%s">' % fill)
         assert len(face) == 3, len(face)
         for i, p in enumerate(face):
@@ -59,7 +59,7 @@ class IpeOutput:
         self._fp = None
         self._current_page = None
 
-    def write(self, line):
+    def _write(self, line):
         print(line, file=self._fp)
 
     def __enter__(self):
@@ -67,12 +67,12 @@ class IpeOutput:
         print("Render", self._filename)
         self._fp = open(self._filename, 'w')
         from terrender import APP_NAME
-        self.write('<ipe version="70000" creator="%s">' % APP_NAME)
+        self._write('<ipe version="70000" creator="%s">' % APP_NAME)
         return self
 
     def __exit__(self, typ, val, tb):
         assert self._fp is not None
-        self.write('</ipe>')
+        self._write('</ipe>')
         self._fp.close()
         self._fp = None
         print("Done with", self._filename)
