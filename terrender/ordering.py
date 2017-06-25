@@ -59,6 +59,7 @@ def debug_output_to(output: 'IpeOutput'):
         DEBUG_OUTPUT = None
 
 
+@cythonized
 def order_overlapping_triangles(faces):
     faces = np.asarray(faces)
     n, k, d = faces.shape
@@ -102,7 +103,7 @@ def order_overlapping_triangles(faces):
         elif SpaceOrder.above in (o, o2):
             before.append((i1, i2))
 
-    return np.array(before)
+    return np.array(before).reshape(-1, 2)
 
 
 def z_order(faces):

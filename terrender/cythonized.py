@@ -34,6 +34,8 @@ def compare_results(path, fast, slow):
     if fast.shape != slow.shape:
         raise DifferentResults(
             path, 'shape %r' % (fast.shape,), 'shape %r' % (slow.shape,))
+    if fast.size == 0:
+        return
     close = np.isclose(fast, slow)
     if fast.ndim == 0 and not close:
         raise DifferentResults(path, fast, slow)

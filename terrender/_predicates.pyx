@@ -182,6 +182,15 @@ def linear_interpolation_2d_single(triangle, x, y):
     return res[2, 0]
 
 
+def bbox_disjoint_2d(np.ndarray t1, np.ndarray t2):
+    min1 = t1.min(axis=0)
+    max1 = t1.max(axis=0)
+    min2 = t2.min(axis=0)
+    max2 = t2.max(axis=0)
+    o = (min1 < max2) & (min2 < max1)
+    return not (o[0] and o[1])
+
+
 def triangle_order(t1, t2):
     assert t1.ndim == t2.ndim == 2
     nvertices, ndim = t1.shape[0], t1.shape[1]
@@ -198,6 +207,9 @@ def triangle_order(t1, t2):
     assert coords.ndim == 2 and coords.shape[0] == 2 and coords.shape[1] == 3
     d = in_triangle_2d_coords(coords)
     assert d.ndim == 1 and d.shape[0] == nvertices
+
+    if bbox_disjoint_2d(t1, t2):
+        return DISJOINT
 
     for i in range(nvertices):
         for j in range(2):
@@ -259,3 +271,32 @@ def triangle_order(t1, t2):
             return ABOVE if diff > 0 else BELOW
 
     return DISJOINT
+
+
+def order_overlapping_triangles(np.ndarray faces):
+    assert faces.ndim == 3
+    n, k, d = faces.shape[0], faces.shape[1], faces.shape[2]
+    assert k == 3  # Triangles
+    if d != 3:
+        assert d == 4  # Homogenous 3D coordinates
+        assert np.allclose(faces[:, :, 3], 1)  # Normalized
+
+    output_size = 0
+    output_buffer = np.zeros((n*(n-1)//2, 2), dtype=np.intp)
+    for i1 in range(n):
+        for i2 in range(i1+1, n):
+            o1 = triangle_order(faces[i1], faces[i2])
+            o2 = triangle_order(faces[i2], faces[i1])
+            if o1 == o2 == DISJOINT:
+                continue
+            elif o1 != DISJOINT and o2 != DISJOINT and o1 == o2:
+                raise AssertionError('inversion')
+            elif o1 == BELOW or o2 == ABOVE:
+                output_buffer[output_size, 0] = i2
+                output_buffer[output_size, 1] = i1
+                output_size += 1
+            else:
+                output_buffer[output_size, 0] = i1
+                output_buffer[output_size, 1] = i2
+                output_size += 1
+    return np.array(output_buffer[:output_size])
