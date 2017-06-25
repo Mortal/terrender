@@ -114,8 +114,21 @@ def cythonized(fn):
 
         return wrapper
 
-    import terrender._predicates
-    return getattr(terrender._predicates, fn.__name__)
+    # Either Python was run with -O or the env var PYTHONOPTIMIZE is set,
+    # so __debug__ is false. Unconditionally use the Cythonized functions.
+
+    try:
+        import terrender._predicates
+    except ImportError as e:
+        raise Exception('Need to compile _predicates.pyx first. Run ' +
+                        'Python without -O (and with PYTHONOPTIMIZE unset) ' +
+                        'to use the slow Python-based predicates.') from e
+
+    try:
+        return getattr(terrender._predicates, fn.__name__)
+    except AttributeError:
+        raise Exception('Could not find Cythonized variant of %s!' %
+                        fn.__name__)
 
 
 @cythonized
