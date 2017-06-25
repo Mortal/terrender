@@ -19,7 +19,7 @@ class Terrain:
         assert corners == [0, 0, 1, 1, 2, 2], corners
         # Take uniform random heights in [-0.5, 0.5)
         self.heights = rng.rand(n) - 0.5
-        self.heights /= 2
+        self.heights /= 3
 
         bounded_face = np.min(self.tri.vertices, axis=1) > 2
         face_indices = self.tri.vertices[bounded_face].ravel()

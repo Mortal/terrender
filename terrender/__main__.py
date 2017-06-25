@@ -14,7 +14,7 @@ def main():
     parser.add_argument('-d', '--debug-output', action='store_true')
     args = parser.parse_args()
 
-    t = Terrain()
+    t = Terrain(40)
     with contextlib.ExitStack() as stack:
         if args.debug_output:
             stack.enter_context(
@@ -23,10 +23,16 @@ def main():
             output = stack.enter_context(PlotOutput())
         else:
             output = stack.enter_context(IpeOutput('side-ortho.ipe'))
+        altitude_angle = -np.pi / 4
+        n = 10
+        for i in range(n):
+            with output.open_page() as page:
+                faces = project_ortho(t, 0, i*altitude_angle/n)
+                page.faces(z_order(faces), faces)
         n = 50
         for i in range(n):
             with output.open_page() as page:
-                faces = project_ortho(t, 0, 2*np.pi*i/n)
+                faces = project_ortho(t, 2*np.pi*i/n, altitude_angle)
                 page.faces(z_order(faces), faces)
 
 
