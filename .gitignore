@@ -1,0 +1,21 @@
+*.swp
+__pycache__
+/build
+*.ipe
+/terrender/_predicates.c
+/terrender/_predicates.*.so
+?? .gitignore.swp
+?? Makefile
+?? __pycache__/
+?? build/
+?? side-ortho.ipe
+?? side-ortho.pdf
+?? terrender/__main__.py
+?? terrender/__pycache__/
+?? terrender/_predicates.c
+?? terrender/_predicates.cpython-36m-x86_64-linux-gnu.so
+?? terrender/backends/.mpl.py.swp
+?? terrender/backends/__init__.py
+?? terrender/backends/__pycache__/
+?? terrender/test.c
+?? terrender/test.cpython-36m-x86_64-linux-gnu.so
