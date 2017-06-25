@@ -70,5 +70,23 @@ def unproject_affine(np.ndarray p0, np.ndarray p1, np.ndarray p2, np.ndarray coo
             (p2-p0).reshape(ndim, 1) * coords[1:2]).reshape(ndim, coords.shape[1])
 
 
-def unproject_affine_2d(p0, p1, p2, coords):
+def unproject_affine_2d(np.ndarray p0, np.ndarray p1, np.ndarray p2, np.ndarray coords):
     return unproject_affine(p0, p1, p2, coords, 2)
+
+
+def unproject_affine_3d(np.ndarray p0, np.ndarray p1, np.ndarray p2, np.ndarray coords):
+    return unproject_affine(p0, p1, p2, coords, 3)
+
+
+def in_triangle_2d(np.ndarray p0, np.ndarray p1, np.ndarray p2, np.ndarray x):
+    coords = project_affine_2d(p0, p1, p2, x)
+    return in_triangle_2d_coords(coords)
+
+
+def in_triangle_2d_coords(np.ndarray coords):
+    '''
+    Helper for in_triangle_2d.
+    '''
+    assert coords.shape[0] == 2
+    c0 = 1 - coords.sum(axis=0)
+    return np.minimum(c0, coords.min(axis=0))

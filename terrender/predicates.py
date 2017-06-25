@@ -139,10 +139,12 @@ def unproject_affine_2d(p0, p1, p2, coords):
     return unproject_affine(p0, p1, p2, coords, ndim=2)
 
 
+@cythonized
 def unproject_affine_3d(p0, p1, p2, coords):
     return unproject_affine(p0, p1, p2, coords, ndim=3)
 
 
+@cythonized
 def in_triangle_2d(p0, p1, p2, x):
     '''
     Returns >0 for in triangle, 0 for boundary, <0 for out of triangle.
@@ -151,6 +153,7 @@ def in_triangle_2d(p0, p1, p2, x):
     return in_triangle_2d_coords(coords)
 
 
+@cythonized
 def in_triangle_2d_coords(coords):
     '''
     Helper for in_triangle_2d.
