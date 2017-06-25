@@ -117,7 +117,7 @@ def linear_interpolation_2d_single(triangle, x, y):
     return res[2, 0]
 
 
-def bbox_disjoint_2d(np.ndarray t1, np.ndarray t2):
+cdef int bbox_disjoint_2d(np.ndarray[DTYPE_t, ndim=2] t1, np.ndarray[DTYPE_t, ndim=2] t2):
     min1 = t1.min(axis=0)
     max1 = t1.max(axis=0)
     min2 = t2.min(axis=0)
@@ -133,12 +133,11 @@ cdef inline int isclose(DTYPE_t a, DTYPE_t b):
     return absdiff <= atol + rtol * abs(b)
 
 
-def triangle_order(t1, t2):
-    assert t1.ndim == t2.ndim == 2
-    nvertices, ndim = t1.shape[0], t1.shape[1]
-    nvertices_, ndim_ = t2.shape[0], t2.shape[1]
-    assert nvertices == nvertices_ == 3
-    assert ndim == ndim_
+cpdef int triangle_order(np.ndarray[DTYPE_t, ndim=2] t1, np.ndarray[DTYPE_t, ndim=2] t2):
+    cdef Py_ssize_t nvertices = 3
+    cdef Py_ssize_t ndim = t1.shape[1]
+    assert t1.shape[0] == t2.shape[0] == 3
+    assert ndim == t2.shape[1]
     if ndim != 3:
         assert ndim == 4  # Homogenous 3D coordinates
         assert np.allclose([t1[:, 3], t2[:, 3]], 1)  # Normalized
@@ -205,6 +204,7 @@ def triangle_order(t1, t2):
         if not isclose(diff, 0):
             return ABOVE if diff > 0 else BELOW
 
+    cdef DTYPE_t c0, d
     for i in range(nvertices):
         c0 = 1 - coords[0, i] - coords[1, i]
         d = float_min(float_min(c0, coords[0, i]), coords[1, i])
