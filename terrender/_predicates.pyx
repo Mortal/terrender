@@ -45,3 +45,30 @@ def change_basis_2d(np.ndarray p1, np.ndarray p2, np.ndarray x):
         raise TypeError('x must be 2 x N')
     m = matrix_inv(p1[0], p2[0], p1[1], p2[1])
     return m @ x
+
+
+def project_affine_2d(np.ndarray p0, np.ndarray p1, np.ndarray p2, np.ndarray x):
+    assert x.ndim == 2
+    d = x.shape[0]
+    n = x.shape[1]
+    assert d == 2
+    assert p0.ndim == p1.ndim == p2.ndim == 1
+    assert p0.shape[0] == p1.shape[0] == p2.shape[0] == 2
+    coords = change_basis_2d(p1 - p0, p2 - p0, x - p0.reshape(d, 1))
+    x2 = unproject_affine_2d(p0, p1, p2, coords)
+    assert np.allclose(x2, x), (x, x2)
+    return coords
+
+
+def unproject_affine(np.ndarray p0, np.ndarray p1, np.ndarray p2, np.ndarray coords, int ndim):
+    assert p0.ndim == p1.ndim == p2.ndim == 1
+    assert p0.shape[0] == p1.shape[0] == p2.shape[0] == ndim
+    assert coords.shape[0] == 2
+    assert coords.ndim == 2
+    return (p0.reshape(ndim, 1) +
+            (p1-p0).reshape(ndim, 1) * coords[0:1] +
+            (p2-p0).reshape(ndim, 1) * coords[1:2]).reshape(ndim, coords.shape[1])
+
+
+def unproject_affine_2d(p0, p1, p2, coords):
+    return unproject_affine(p0, p1, p2, coords, 2)

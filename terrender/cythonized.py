@@ -46,6 +46,9 @@ def compare_results(path, fast, slow):
         path, fast[incorrect_idx], slow[incorrect_idx])
 
 
+_running_slow = False
+
+
 def cythonized(fn):
     if __debug__:
         try:
@@ -56,10 +59,18 @@ def cythonized(fn):
             return fn
 
         def wrapper(*args, **kwargs):
-            fast_result = fast_fn(*args, **kwargs)
-            slow_result = fn(*args, **kwargs)
-            compare_results(fn.__name__, fast_result, slow_result)
-            return fast_result
+            global _running_slow
+            if _running_slow:
+                return fn(*args, **kwargs)
+            _running_slow = True
+            try:
+                fast_result = fast_fn(*args, **kwargs)
+                slow_result = fn(*args, **kwargs)
+                compare_results(fn.__name__, fast_result, slow_result)
+                print("Compared", fn.__name__)
+                return fast_result
+            finally:
+                _running_slow = False
 
         return wrapper
 

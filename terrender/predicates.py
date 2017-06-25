@@ -97,6 +97,7 @@ def change_basis_2d(p1, p2, x):
     return c
 
 
+@cythonized
 def project_affine_2d(p0, p1, p2, x):
     '''
     >>> print(project_affine_2d([0, 0], [1, 0], [0, 1], [[0], [0]]).T)
@@ -119,6 +120,7 @@ def project_affine_2d(p0, p1, p2, x):
     return coords
 
 
+@cythonized
 def unproject_affine(p0, p1, p2, coords, ndim):
     p0, p1, p2 = np.asarray(p0), np.asarray(p1), np.asarray(p2)
     coords = np.asarray(coords)
@@ -132,6 +134,7 @@ def unproject_affine(p0, p1, p2, coords, ndim):
             (p2-p0).reshape(ndim, 1) * coords[1:2]).reshape(result_shape)
 
 
+@cythonized
 def unproject_affine_2d(p0, p1, p2, coords):
     return unproject_affine(p0, p1, p2, coords, ndim=2)
 
