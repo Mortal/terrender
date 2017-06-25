@@ -103,6 +103,7 @@ def order_overlapping_triangles(faces):
         elif SpaceOrder.above in (o, o2):
             before.append((i1, i2))
 
+    # reshape to return empty (0, 2)-array instead of empty (0,)-array
     return np.array(before).reshape(-1, 2)
 
 
