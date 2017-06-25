@@ -1,5 +1,6 @@
 import scipy.spatial
 import numpy as np
+from terrender import sobol_sequence
 
 
 class Terrain:
@@ -10,8 +11,8 @@ class Terrain:
             [-2, 3],
             [3, 0],
         ])
-        # Take uniform random xy-coordinates in [-0.5, 0.5)
-        vertex_xy = rng.rand(n, 2) - 0.5
+        # Take xy-coordinates in [-0.5, 0.5)
+        vertex_xy = sobol_sequence.sample(2*n, 2)[n:] - 0.5
         print(vertex_xy)
         points = np.concatenate((corners, vertex_xy))
         self.tri = scipy.spatial.Delaunay(points)
