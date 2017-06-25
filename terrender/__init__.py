@@ -1,14 +1,14 @@
-DESCRIPTION = '''\
-Render terrains to vector formats
-'''.rstrip('\n')
-
-
 import numpy as np
 import enum
 from terrender import predicates
 from terrender.cythonized import cythonized
 from terrender.terrain import Terrain
 import terrender.backends.ipe as draw
+
+
+DESCRIPTION = '''\
+Render terrains to vector formats
+'''.rstrip('\n')
 
 
 EPS = 1e-9
