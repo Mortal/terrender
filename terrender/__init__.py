@@ -4,6 +4,7 @@ from terrender import predicates
 from terrender.cythonized import cythonized
 from terrender.terrain import Terrain
 from terrender.backends.ipe import IpeOutput
+from terrender.backends.mpl import PlotOutput
 
 
 DESCRIPTION = '''\
@@ -171,7 +172,7 @@ def main():
     # with open_writer('top-rot.ipe') as write:
     #     faces = project_ortho(t, 0.1, 0)
     #     draw.faces(write, z_order(faces), faces)
-    with IpeOutput('side-ortho.ipe') as output:
+    with PlotOutput() as output:
         n = 50
         for i in range(n):
             with output.open_page() as page:
