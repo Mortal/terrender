@@ -90,3 +90,78 @@ def in_triangle_2d_coords(np.ndarray coords):
     assert coords.shape[0] == 2
     c0 = 1 - coords.sum(axis=0)
     return np.minimum(c0, coords.min(axis=0))
+
+
+def triangle_intersection_2d_coords(np.ndarray coords):
+    assert coords.ndim == 3
+    ndim, nvertices, n = coords.shape[0], coords.shape[1], coords.shape[2]
+    assert ndim == 2
+    assert nvertices == 3
+    coords_flat = coords.reshape(ndim, nvertices*n)
+    d = in_triangle_2d_coords(coords_flat).reshape(nvertices, n)
+
+    d_sign = d >= 0
+
+    # intersects = np.zeros(n, dtype=bool)
+    # result = np.zeros((ndim, n))
+    intersects = []
+    result = []
+    for i in range(nvertices):
+        for j in range(ndim):
+            x1 = coords[1-j, i, :]
+            x2 = coords[1-j, (1 + i) % nvertices, :]
+            y1 = coords[j, i, :]
+            y2 = coords[j, (1 + i) % nvertices, :]
+            has_y_intersection = ~np.isclose(x1, x2)
+            dy = y2 - y1
+            dy_dx = np.divide(dy, x2 - x1, out=dy, where=has_y_intersection)
+            # y - y1 = dy_dx * (x - x1)
+            # y_at_0 = y1 - dy_dx * x1
+            y_intersection = y1 - dy_dx * x1
+            b = (has_y_intersection &
+                 (np.minimum(x1, x2) < 0) &
+                 (0 < np.maximum(x1, x2)) &
+                 (0 < y_intersection) & (y_intersection < 1))
+            intersects.append(b)
+            r = np.zeros((ndim, n))
+            r[j, b] = y_intersection[b]
+            # r[1-j, b] = 0
+            result.append(r)
+
+        x1 = coords[0, i, :]
+        x2 = coords[0, (1 + i) % nvertices, :]
+        y1 = coords[1, i, :]
+        y2 = coords[1, (1 + i) % nvertices, :]
+        # Consider the line segment on the line x+y=1
+        # where -1 < x-y < 1
+        sum1, diff1 = x1 + y1 - 1, x1 - y1
+        sum2, diff2 = x2 + y2 - 1, x2 - y2
+        has_y_intersection = ~np.isclose(sum1, sum2)
+        dy = diff2 - diff1
+        dy_dx = np.divide(dy, sum2 - sum1, out=dy, where=has_y_intersection)
+        # y - y1 = dy_dx * (x - x1)
+        # y_at_0 = y1 - dy_dx * x1
+        sum_intersection = diff1 - dy_dx * sum1
+        b = (has_y_intersection &
+             (np.minimum(sum1, sum2) < 0) &
+             (0 < np.maximum(sum1, sum2)) &
+             (-1 < sum_intersection) & (sum_intersection < 1))
+        intersects.append(b)
+        r = np.zeros((ndim, n))
+        # x-y == sum_intersection
+        # x+y == 1
+        # y=1-x
+        # x=1-y
+        # 2x-1 = sum_intersection
+        # 1-2y = sum_intersection
+
+        r[0, b] = (sum_intersection[b] + 1)/2
+        r[1, b] = (1 - sum_intersection[b])/2
+        result.append(r)
+
+    for i in range(nvertices):
+        vertex_inside = ~np.isclose(d[i], 0) & d_sign[i]
+        intersects.append(vertex_inside)
+        result.append(coords[:, i, :])
+
+    return np.array(result), np.array(intersects)

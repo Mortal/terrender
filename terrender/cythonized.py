@@ -67,7 +67,6 @@ def cythonized(fn):
                 fast_result = fast_fn(*args, **kwargs)
                 slow_result = fn(*args, **kwargs)
                 compare_results(fn.__name__, fast_result, slow_result)
-                print("Compared", fn.__name__)
                 return fast_result
             finally:
                 _running_slow = False
