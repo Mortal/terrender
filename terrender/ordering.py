@@ -47,7 +47,7 @@ DEBUG_OUTPUT = None  # type: IpeOutput
 
 
 @contextlib.contextmanager
-def debug_output_to(output):
+def debug_output_to(output: 'IpeOutput'):
     global DEBUG_OUTPUT
     assert DEBUG_OUTPUT is None
     DEBUG_OUTPUT = output
