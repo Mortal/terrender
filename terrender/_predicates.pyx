@@ -163,13 +163,8 @@ cdef inline int isclose(DTYPE_t a, DTYPE_t b):
 cpdef int triangle_order(np.ndarray[DTYPE_t, ndim=2] t1, np.ndarray[DTYPE_t, ndim=2] t2):
     cdef Py_ssize_t nvertices = 3
     cdef Py_ssize_t ndim = t1.shape[1]
-    assert t1.shape[0] == t2.shape[0] == 3
-    assert ndim == t2.shape[1]
-    if ndim != 3:
-        assert ndim == 4  # Homogenous 3D coordinates
-        assert np.allclose([t1[:, 3], t2[:, 3]], 1)  # Normalized
-        t1 = t1[:, :3]
-        t2 = t2[:, :3]
+    assert t1.shape[0] == t2.shape[0] == nvertices
+    assert ndim == t2.shape[1] == 4
 
     cdef np.ndarray[DTYPE_t, ndim=2] coords = np.array(t2[:, :2].T)
     project_affine_2d_inplace(t1[0, :2], t1[1, :2], t1[2, :2], coords)
