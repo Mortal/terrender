@@ -3,7 +3,7 @@ import enum
 from terrender import predicates
 from terrender.cythonized import cythonized
 from terrender.terrain import Terrain
-import terrender.backends.ipe as draw
+from terrender.backends.ipe import IpeOutput
 
 
 DESCRIPTION = '''\
@@ -56,7 +56,7 @@ class SpaceOrder(enum.Enum):
         return cls.above if sign > 0 else cls.below
 
 
-def triangle_order(t1, t2, open_page=None):
+def triangle_order(t1, t2, output: IpeOutput=None):
     nvertices, ndim = t1.shape
     assert t1.shape == t2.shape
     assert nvertices == 3, t1.shape  # Triangles
@@ -70,16 +70,16 @@ def triangle_order(t1, t2, open_page=None):
     # print(d, b)
     proper_overlap = b and not np.isclose(d, 0)
 
-    if open_page is not None:
-        with open_page() as write:
-            draw.write_face(write, t1)
-            draw.write_face(write, t2)
-            draw.write_label(write, x, y, '%.0g' % d if proper_overlap else 'D')
+    if output is not None:
+        with output.open_page() as page:
+            page.face(t1)
+            page.face(t2)
+            page.label(x, y, '%.0g' % d if proper_overlap else 'D')
     return (SpaceOrder.from_sign(d) if proper_overlap
             else SpaceOrder.disjoint)
 
 
-def z_order(faces, open_page=None):
+def z_order(faces, output: IpeOutput=None):
     faces = np.asarray(faces)
     n, k, d = faces.shape
     assert k == 3  # Triangles
@@ -107,15 +107,15 @@ def z_order(faces, open_page=None):
     before = {}
 
     for i1, i2 in zip(i1s, i2s):
-        o = triangle_order(faces[i1], faces[i2], open_page)
-        o2 = triangle_order(faces[i2], faces[i1], open_page).flip()
+        o = triangle_order(faces[i1], faces[i2], output)
+        o2 = triangle_order(faces[i2], faces[i1], output).flip()
         if o != o.flip() == o2:
-            if open_page is not None:
-                with open_page() as write:
-                    draw.write_face(write, faces[i1])
-                    draw.write_face(write, faces[i2])
+            if output is not None:
+                with output.open_page() as page:
+                    page.face(faces[i1])
+                    page.face(faces[i2])
                     for x, y, z, *w in faces[i1].tolist() + faces[i2].tolist():
-                        draw.write_label(write, x, y, '%g' % z)
+                        page.label(x, y, '%g' % z)
             raise AssertionError('inversion')
         if SpaceOrder.below in (o, o2):
             before.setdefault(i2, []).append(i1)
@@ -167,16 +167,16 @@ def main():
     t = Terrain()
     # with open_writer('top.ipe') as write:
     #     faces = project_ortho(t, 0, 0)
-    #     draw.output_faces(write, z_order(faces), faces)
+    #     draw.faces(write, z_order(faces), faces)
     # with open_writer('top-rot.ipe') as write:
     #     faces = project_ortho(t, 0.1, 0)
-    #     draw.output_faces(write, z_order(faces), faces)
-    with draw.open_multipage_writer('side-ortho.ipe') as open_page:
+    #     draw.faces(write, z_order(faces), faces)
+    with IpeOutput('side-ortho.ipe') as output:
         n = 50
         for i in range(n):
-            with open_page() as write:
+            with output.open_page() as page:
                 faces = project_ortho(t, 0, 2*np.pi*i/n)
-                draw.output_faces(write, z_order(faces), faces)
+                page.faces(z_order(faces), faces)
 
 
 if __name__ == '__main__':
