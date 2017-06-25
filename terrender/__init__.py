@@ -100,10 +100,10 @@ def compare_results(path, fast, slow):
 def cythonized(fn):
     if __debug__:
         try:
-            import terrender.test
-            fast_fn = getattr(terrender.test, fn.__name__)
+            import terrender._predicates
+            fast_fn = getattr(terrender._predicates, fn.__name__)
         except (ImportError, AttributeError):
-            print("Could not import terrender.test.%s" % fn.__name__)
+            print("Could not import terrender._predicates.%s" % fn.__name__)
             return fn
 
         def wrapper(*args, **kwargs):
@@ -114,8 +114,8 @@ def cythonized(fn):
 
         return wrapper
 
-    import terrender.test
-    return getattr(terrender.test, fn.__name__)
+    import terrender._predicates
+    return getattr(terrender._predicates, fn.__name__)
 
 
 @cythonized
