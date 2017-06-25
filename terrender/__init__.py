@@ -43,34 +43,6 @@ def rot_4d_yz(angle):
     ])
 
 
-def project(vertex, triangle):
-    vertex = np.asarray(vertex)
-    if vertex.ndim < 2:
-        onedim = True
-        vertex = vertex.reshape(1, -1)
-    else:
-        onedim = False
-        assert vertex.ndim == 2
-    triangle = np.asarray(triangle)
-    assert triangle.shape[0] == 3
-    assert triangle.shape[1] in (3, 4)
-    assert vertex.shape[-1] == triangle.shape[1]
-    b, c = triangle[1:3] - triangle[0]
-    v = vertex - triangle[0:1]
-
-    local = (np.linalg.inv(np.transpose([b[:2], c[:2]])) @
-             v.T[:2]).T
-    assert local.shape == (len(v), 2), local.shape
-    proj = (triangle[0:1].T +
-            np.transpose([b, c]) @
-            local.T).T
-    assert proj.shape == (len(v), triangle.shape[1]), proj.shape
-    if onedim:
-        return local[0], proj[0]
-    else:
-        return local, proj
-
-
 class SpaceOrder(enum.Enum):
     above = 1
     below = 2
