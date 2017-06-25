@@ -39,8 +39,8 @@ def triangle_order(t1, t2):
             page.face(t1)
             page.face(t2)
             page.label(x, y, '%.0g' % d if proper_overlap else 'D')
-    return (SpaceOrder.from_sign(d) if proper_overlap
-            else SpaceOrder.disjoint)
+    return (SpaceOrder.from_sign(d).value if proper_overlap
+            else SpaceOrder.disjoint.value)
 
 
 DEBUG_OUTPUT = None  # type: IpeOutput
@@ -85,8 +85,8 @@ def order_overlapping_triangles(faces):
     before = []
 
     for i1, i2 in zip(i1s, i2s):
-        o = triangle_order(faces[i1], faces[i2])
-        o2 = triangle_order(faces[i2], faces[i1]).flip()
+        o = SpaceOrder(triangle_order(faces[i1], faces[i2]))
+        o2 = SpaceOrder(triangle_order(faces[i2], faces[i1])).flip()
         if o != o.flip() == o2:
             if DEBUG_OUTPUT is not None:
                 with DEBUG_OUTPUT.open_page() as page:
