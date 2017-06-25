@@ -163,43 +163,6 @@ def in_triangle_2d_coords(coords):
     return np.minimum(c0, coords.min(axis=0))
 
 
-def triangle_intersection_2d(p0, p1, p2, xs):
-    '''
-    Given a single triangle p0p1p2 and a number of triangles,
-    determine which triangles intersect p0p1p2
-    and a common point in their intersection.
-
-    Parameters:
-
-    p0, p1, p2: (2,) array of float
-    xs: (3, 2, n) array of float
-
-    Returns:
-
-    p: (2, n) array of float
-    b: (n,) array of bool
-    '''
-    p0, p1, p2 = np.asarray(p0), np.asarray(p1), np.asarray(p2)
-    xs = np.asarray(xs)
-    assert p0.shape == p1.shape == p2.shape == (2,)
-    nvertices, ndim, n = xs.shape
-    assert nvertices == 3  # Triangles
-    assert ndim == 2  # in the plane
-
-    xs_flat = np.swapaxes(xs, 0, 1).reshape(ndim, nvertices*n)
-
-    coords_flat = project_affine_2d(p0, p1, p2, xs_flat)
-    assert coords_flat.shape == (ndim, nvertices*n)
-    coords = coords_flat.reshape(ndim, nvertices, n)
-
-    result, intersects = triangle_intersection_2d_coords(coords)
-    TODO
-
-    result_projected = unproject_affine_2d(p0, p1, p2, result)
-
-    return result_projected, intersects
-
-
 def triangle_intersection_2d_coords(coords):
     ndim, nvertices, n = coords.shape
     coords_flat = coords.reshape(ndim, nvertices*n)
