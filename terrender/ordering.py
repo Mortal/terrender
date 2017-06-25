@@ -114,6 +114,8 @@ def z_order(faces):
     before = {}
     for i, j in before_list:
         before.setdefault(i, []).append(j)
+        if i in before.get(j, ()):
+            raise AssertionError('inversion')
 
     state = np.zeros(n)
     output = []

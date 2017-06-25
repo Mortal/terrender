@@ -254,16 +254,13 @@ def order_overlapping_triangles(np.ndarray[DTYPE_t, ndim=3] faces):
     cdef Py_ssize_t output_size = 0
     cdef np.ndarray[Py_ssize_t, ndim=2] output_buffer = np.zeros((n*(n-1)//2, 2), dtype=np.intp)
     cdef Py_ssize_t i1, i2
-    cdef int o1, o2
+    cdef int o
     for i1 in range(n):
         for i2 in range(i1+1, n):
-            o1 = triangle_order(faces[i1], faces[i2])
-            o2 = triangle_order(faces[i2], faces[i1])
-            if o1 == o2 == DISJOINT:
+            o = triangle_order(faces[i1], faces[i2])
+            if o == DISJOINT:
                 continue
-            elif o1 != DISJOINT and o2 != DISJOINT and o1 == o2:
-                raise AssertionError('inversion')
-            elif o1 == BELOW or o2 == ABOVE:
+            elif o == BELOW:
                 output_buffer[output_size, 0] = i1
                 output_buffer[output_size, 1] = i2
                 output_size += 1
