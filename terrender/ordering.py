@@ -43,7 +43,7 @@ def triangle_order(t1, t2, output: 'IpeOutput'=None):
             else SpaceOrder.disjoint)
 
 
-DEBUG_OUTPUT = None
+DEBUG_OUTPUT = None  # type: IpeOutput
 
 
 @contextlib.contextmanager
