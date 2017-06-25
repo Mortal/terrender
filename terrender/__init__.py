@@ -8,9 +8,7 @@ import enum
 from terrender import predicates
 from terrender.cythonized import cythonized
 from terrender.terrain import Terrain
-from terrender.backends.ipe import (
-    open_multipage_writer, output_faces, write_face, write_label,
-)
+import terrender.backends.ipe as draw
 
 
 EPS = 1e-9
@@ -74,9 +72,9 @@ def triangle_order(t1, t2, open_page=None):
 
     if open_page is not None:
         with open_page() as write:
-            write_face(write, t1)
-            write_face(write, t2)
-            write_label(write, x, y, '%.0g' % d if proper_overlap else 'D')
+            draw.write_face(write, t1)
+            draw.write_face(write, t2)
+            draw.write_label(write, x, y, '%.0g' % d if proper_overlap else 'D')
     return (SpaceOrder.from_sign(d) if proper_overlap
             else SpaceOrder.disjoint)
 
@@ -114,10 +112,10 @@ def z_order(faces, open_page=None):
         if o != o.flip() == o2:
             if open_page is not None:
                 with open_page() as write:
-                    write_face(write, faces[i1])
-                    write_face(write, faces[i2])
+                    draw.write_face(write, faces[i1])
+                    draw.write_face(write, faces[i2])
                     for x, y, z, *w in faces[i1].tolist() + faces[i2].tolist():
-                        write_label(write, x, y, '%g' % z)
+                        draw.write_label(write, x, y, '%g' % z)
             raise AssertionError('inversion')
         if SpaceOrder.below in (o, o2):
             before.setdefault(i2, []).append(i1)
@@ -169,16 +167,16 @@ def main():
     t = Terrain()
     # with open_writer('top.ipe') as write:
     #     faces = project_ortho(t, 0, 0)
-    #     output_faces(write, z_order(faces), faces)
+    #     draw.output_faces(write, z_order(faces), faces)
     # with open_writer('top-rot.ipe') as write:
     #     faces = project_ortho(t, 0.1, 0)
-    #     output_faces(write, z_order(faces), faces)
-    with open_multipage_writer('side-ortho.ipe') as open_page:
+    #     draw.output_faces(write, z_order(faces), faces)
+    with draw.open_multipage_writer('side-ortho.ipe') as open_page:
         n = 50
         for i in range(n):
             with open_page() as write:
                 faces = project_ortho(t, 0, 2*np.pi*i/n)
-                output_faces(write, z_order(faces), faces)
+                draw.output_faces(write, z_order(faces), faces)
 
 
 if __name__ == '__main__':
