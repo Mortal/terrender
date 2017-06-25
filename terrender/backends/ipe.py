@@ -42,11 +42,44 @@ class IpeOutputPage:
         write('h')
         write('</path>')
 
-    def faces(self, order, faces, lightness=None):
+    def polyline(self, coords, color='1 0 0'):
+        write = self._parent._write
+        write('<path stroke="%s">' % color)
+        for i, p in enumerate(coords):
+            command = 'm' if i == 0 else 'l'
+            write('%.15f %.15f %s' % (p[0], p[1], command))
+        write('</path>')
+
+    def face_contour(self, face, zs, contour):
+        a = []
+        b = []
+        for i, z in enumerate(zs):
+            if z < contour:
+                b.append(i)
+            else:
+                a.append(i)
+        if sorted((len(a), len(b))) == [1, 2]:
+            p = []
+            for i in range(2):
+                i1 = a[i % len(a)]
+                i2 = b[i % len(b)]
+                c = (contour - zs[i1]) / (zs[i2] - zs[i1])
+                if not -1e-9 <= c <= 1+1e-9:
+                    raise AssertionError((contour, zs, a, b, i, c))
+                x1, y1, *zw1 = face[i1]
+                x2, y2, *zw2 = face[i2]
+                p.append((x1 + c * (x2 - x1),
+                          y1 + c * (y2 - y1)))
+            self.polyline(p)
+
+    def faces(self, order, faces, lightness=None, contour=None):
         for i in order:
             face = faces[i]
             l = lightness[i] if lightness is not None else 1 - min(i/4, 1) * .3
             self.face(face, l)
+            if contour is not None:
+                threshold, orig_zs = contour
+                self.face_contour(face, orig_zs[i], threshold)
             # for i, p in enumerate(face):
             #     self.label(p[0], p[1], '%.0f' % (500 + 1000 * p[2]))
             # centroid = np.mean(face, axis=0)

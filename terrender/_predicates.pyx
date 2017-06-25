@@ -3,6 +3,8 @@
 import numpy as np
 cimport numpy as np
 import math
+# import time
+cimport cython
 
 DTYPE = np.float64
 ctypedef np.float64_t DTYPE_t
@@ -172,6 +174,7 @@ cdef inline int isclose(DTYPE_t a, DTYPE_t b):
     return absdiff <= atol + rtol * abs(b)
 
 
+# @cython.boundscheck(False)
 cdef int triangle_order(np.ndarray[DTYPE_t, ndim=2] t1, np.ndarray[DTYPE_t, ndim=2] t2,
                         np.ndarray[DTYPE_t, ndim=2] coords) except -1:
     # coords is the coordinates of t2 relative to t1
@@ -268,6 +271,7 @@ def order_overlapping_triangles(np.ndarray[DTYPE_t, ndim=3] faces):
     cdef Py_ssize_t i1, i2
     cdef int o
     cdef np.ndarray[DTYPE_t, ndim=2] coords_buffer = np.zeros((n*k, 2), dtype=DTYPE)
+    # t1 = time.time()
     for i1 in range(n):
         project_affine_2d_inplace(faces[i1, 0, :2],
                                   faces[i1, 1, :2],
@@ -288,4 +292,6 @@ def order_overlapping_triangles(np.ndarray[DTYPE_t, ndim=3] faces):
                 output_buffer[output_size, 0] = i2
                 output_buffer[output_size, 1] = i1
                 output_size += 1
+    # t2 = time.time()
+    # print(t2 - t1, (t2 - t1) / (n*n))
     return np.array(output_buffer[:output_size])
