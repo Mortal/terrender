@@ -125,9 +125,10 @@ def triangle_order(t1, t2, debug=None):
     (x, y), (d,), (b,) = predicates.triangle_order_3d(
         t1[0], t1[1], t1[2], t2[:, :, np.newaxis])
     # print(d, b)
+    proper_overlap = b and not np.isclose(d, 0)
     if debug is not None:
-        debug(x, y, '%.0g' % d if b else 'D')
-    return (SpaceOrder.from_sign(d) if b and not np.isclose(d, 0)
+        debug(x, y, '%.0g' % d if proper_overlap else 'D')
+    return (SpaceOrder.from_sign(d) if proper_overlap
             else SpaceOrder.disjoint)
 
 
@@ -301,7 +302,7 @@ def main():
     #     output_faces(write, project_ortho(t, 0.1, 0))
     with open_multipage_writer('side-ortho.ipe') as open_page:
         n = 50
-        for i in range(4, 5):
+        for i in range(15, 16):
             with open_page() as write:
                 output_faces(write, project_ortho(t, 0, 2*np.pi*i/n))
 
