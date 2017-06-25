@@ -145,8 +145,9 @@ def triangle_order(t1, t2):
         t1 = t1[:, :3]
         t2 = t2[:, :3]
 
+    cdef np.ndarray[DTYPE_t, ndim=2] coords
     coords = project_affine_2d_inplace(t1[0, :2], t1[1, :2], t1[2, :2], np.array(t2[:, :2].T))
-    assert coords.ndim == 2 and coords.shape[0] == 2 and coords.shape[1] == 3
+    assert coords.shape[0] == 2 and coords.shape[1] == 3
 
     if bbox_disjoint_2d(t1, t2):
         return DISJOINT
