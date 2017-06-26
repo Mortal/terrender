@@ -68,7 +68,7 @@ def compare_edges(path, fast, slow):
 
 
 def cythonized(fn, comparator=compare_results):
-    if __debug__:
+    if False:
         try:
             import terrender._predicates
             fast_fn = getattr(terrender._predicates, fn.__name__)

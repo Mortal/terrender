@@ -285,12 +285,12 @@ def order_overlapping_triangles(np.ndarray[DTYPE_t, ndim=3] faces):
             if o == DISJOINT:
                 continue
             elif o == BELOW:
-                output_buffer[output_size, 0] = i1
-                output_buffer[output_size, 1] = i2
-                output_size += 1
-            else:
                 output_buffer[output_size, 0] = i2
                 output_buffer[output_size, 1] = i1
+                output_size += 1
+            else:
+                output_buffer[output_size, 0] = i1
+                output_buffer[output_size, 1] = i2
                 output_size += 1
     # t2 = time.time()
     # print(t2 - t1, (t2 - t1) / (n*n))

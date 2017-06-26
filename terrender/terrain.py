@@ -4,23 +4,38 @@ from terrender import sobol_sequence
 
 
 class Terrain:
-    def __init__(self, n=20, seed=2):
-        rng = np.random.RandomState(seed)
-        corners = np.array([
-            [-2, -3],
-            [-2, 3],
-            [3, 0],
-        ])
+    @classmethod
+    def sobol(cls, n=20, seed=2):
         # Take xy-coordinates in [-0.5, 0.5)
         vertex_xy = sobol_sequence.sample(2*n, 2)[n:] - 0.5
-        print(vertex_xy)
+        # Take uniform random heights in [-0.5, 0.5)
+        rng = np.random.RandomState(seed)
+        heights = rng.rand(n, 1) - 0.5
+        heights /= 3
+        return cls(np.c_[vertex_xy, heights])
+
+    def __init__(self, points):
+        points = np.asarray(points)
+        n, d = points.shape
+        assert n >= 3
+        assert d == 3
+
+        vertex_xy = points[:, :2]
+        self.heights = points[:, 2]
+
+        xmin, ymin = vertex_xy.min(axis=0)
+        xmax, ymax = vertex_xy.max(axis=0)
+        diameter = max(xmax-xmin, ymax-ymin)
+        corners = np.array([
+            [xmin-diameter, ymin-2*diameter],
+            [xmin-diameter, ymax+2*diameter],
+            [xmax+2*diameter, ymin+(ymax-ymin)/2],
+        ])
+
         points = np.concatenate((corners, vertex_xy))
-        self.tri = scipy.spatial.Delaunay(points)
+        self.tri = scipy.spatial.Delaunay(points - points.mean(axis=0, keepdims=True))
         corners = sorted(np.ravel(self.tri.convex_hull).tolist())
         assert corners == [0, 0, 1, 1, 2, 2], corners
-        # Take uniform random heights in [-0.5, 0.5)
-        self.heights = rng.rand(n) - 0.5
-        self.heights /= 3
 
         bounded_face = np.min(self.tri.vertices, axis=1) > 2
         face_indices = self.tri.vertices[bounded_face].ravel()

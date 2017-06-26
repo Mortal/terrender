@@ -98,9 +98,9 @@ def order_overlapping_triangles(faces):
                         page.label(x, y, '%g' % z)
             raise AssertionError('inversion')
         if SpaceOrder.below in (o, o2):
-            before.append((i1, i2))
-        elif SpaceOrder.above in (o, o2):
             before.append((i2, i1))
+        elif SpaceOrder.above in (o, o2):
+            before.append((i1, i2))
 
     # reshape to return empty (0, 2)-array instead of empty (0,)-array
     return np.array(before).reshape(-1, 2)

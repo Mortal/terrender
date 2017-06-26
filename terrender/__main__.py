@@ -8,6 +8,7 @@ from terrender.backends.mpl import PlotOutput
 from terrender.projection import project_ortho, project_persp
 from terrender.ordering import z_order, debug_output_to
 from terrender.lighting import flat_shading
+from terrender.las import get_sample
 
 
 def main():
@@ -17,22 +18,33 @@ def main():
     parser.add_argument('-f', '--field-of-view', type=float)
     args = parser.parse_args()
 
-    t = Terrain(100)
+    # t = Terrain(get_sample())
+    t = Terrain.sobol(100)
+    make_animation(t, **vars(args))
+
+
+def make_animation(t, matplotlib=False, debug_output=False, field_of_view=None):
     with contextlib.ExitStack() as stack:
-        if args.debug_output:
+        if debug_output:
             stack.enter_context(
                 debug_output_to(stack.enter_context(IpeOutput('z_order.ipe'))))
-        if args.matplotlib:
+        if matplotlib:
             output = stack.enter_context(PlotOutput())
         else:
             output = stack.enter_context(IpeOutput('side-ortho.ipe'))
         altitude_angle = -np.pi / 4
-        if args.field_of_view:
+        pmin = t.faces.min(axis=(0, 1))
+        pmax = t.faces.max(axis=(0, 1))
+        center = pmin + (pmax - pmin) / 2
+        if field_of_view:
             project_fun = functools.partial(
-                project_persp, field_of_view=np.radians(args.field_of_view),
+                project_persp, focus_center=center[:3], focus_radius=(pmax-pmin)[:2].max(),
+                field_of_view=np.radians(field_of_view),
                 camera_dist=2)
         else:
-            project_fun = project_ortho
+            project_fun = functools.partial(
+                project_ortho, focus_center=center[:3], focus_radius=(pmax-pmin)[:2].max(),
+            )
 
         zmin = t.faces[:, :, 2].min()
         zmax = t.faces[:, :, 2].max()
@@ -41,7 +53,8 @@ def main():
         light = flat_shading(t, np.radians(30), np.radians(30))
 
         with output.open_page() as page:
-            faces = project_ortho(t, np.pi, 0)
+            faces = project_ortho(t, center[:3], (pmax-pmin)[:2].max(),
+                                  circumference_angle=0, altitude_angle=0)
             page.faces(z_order(faces), faces, light, contour=contour)
 
         # with IpeOutput('order_z.ipe') as debug, debug_output_to(debug):
@@ -52,18 +65,18 @@ def main():
         n = 10
         for i in range(n):
             with output.open_page() as page:
-                faces = project_fun(t, 0, i*altitude_angle/n)
+                faces = project_fun(t, circumference_angle=0, altitude_angle=i*altitude_angle/n)
                 page.faces(z_order(faces), faces, light, contour=contour)
         n = 50
         for i in range(n):
             with output.open_page() as page:
                 circ_angle = 2*np.pi*i/n
                 light = flat_shading(t, circ_angle + np.radians(30), np.radians(30))
-                faces = project_fun(t, circ_angle, altitude_angle)
+                faces = project_fun(t, circumference_angle=circ_angle, altitude_angle=altitude_angle)
                 page.faces(z_order(faces), faces, light, contour=contour)
 
         n = 50
-        faces = project_fun(t, 0, altitude_angle)
+        faces = project_fun(t, circumference_angle=0, altitude_angle=altitude_angle)
         z = z_order(faces)
         for i in range(n):
             with output.open_page() as page:
