@@ -73,6 +73,8 @@ def project_persp(t: 'Terrain', focus_center, focus_radius,
     focus_center = np.asarray(focus_center)
     assert focus_center.shape == (3,)
 
+    altitude_angle += np.pi
+
     view_dist_inverse = np.tan(field_of_view/2)
     parallel = np.isclose(view_dist_inverse, 0)
 
