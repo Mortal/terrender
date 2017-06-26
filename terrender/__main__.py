@@ -18,7 +18,7 @@ def main():
     parser.add_argument('-n', '--point-count', type=int, default=100)
     parser.add_argument('-m', '--matplotlib', action='store_true')
     parser.add_argument('-d', '--debug-output', action='store_true')
-    parser.add_argument('-f', '--field-of-view', type=float)
+    parser.add_argument('-f', '--field-of-view', type=float, default=0.0)
     args = vars(parser.parse_args())
 
     n = args.pop('point_count')
