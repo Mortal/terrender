@@ -1,5 +1,6 @@
 import numpy as np
 import functools
+import contextlib
 
 
 class DifferentResults(Exception):
@@ -51,7 +52,25 @@ def compare_results(path, fast, slow):
         path, fast[incorrect_idx], slow[incorrect_idx])
 
 
-_running_slow = False
+SLOW, FAST, COMPARE = range(3)
+_mode = FAST
+
+
+@contextlib.contextmanager
+def mode(m):
+    global _mode
+    assert m in (SLOW, FAST, COMPARE)
+    prev = _mode
+    _mode = m
+    try:
+        yield
+    finally:
+        _mode = prev
+
+
+go_slow = functools.partial(mode, SLOW)
+go_fast = functools.partial(mode, FAST)
+go_compare = functools.partial(mode, COMPARE)
 
 
 def compare_edges(path, fast, slow):
@@ -68,7 +87,7 @@ def compare_edges(path, fast, slow):
 
 
 def cythonized(fn, comparator=compare_results):
-    if False:
+    if __debug__:
         try:
             import terrender._predicates
             fast_fn = getattr(terrender._predicates, fn.__name__)
@@ -77,17 +96,17 @@ def cythonized(fn, comparator=compare_results):
             return fn
 
         def wrapper(*args, **kwargs):
-            global _running_slow
-            if _running_slow:
+            if _mode == SLOW:
                 return fn(*args, **kwargs)
-            _running_slow = True
-            try:
-                fast_result = fast_fn(*args, **kwargs)
+            elif _mode == FAST:
+                return fast_fn(*args, **kwargs)
+            else:
+                assert _mode == COMPARE
+            fast_result = fast_fn(*args, **kwargs)
+            with go_slow():
                 slow_result = fn(*args, **kwargs)
-                comparator(fn.__name__, fast_result, slow_result)
-                return fast_result
-            finally:
-                _running_slow = False
+            comparator(fn.__name__, fast_result, slow_result)
+            return fast_result
 
         return wrapper
 

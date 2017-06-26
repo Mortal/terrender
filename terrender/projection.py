@@ -69,25 +69,34 @@ def scale(s):
 
 
 def project_persp(t: 'Terrain', focus_center, focus_radius,
-                  circumference_angle, altitude_angle, field_of_view, camera_dist):
+                  circumference_angle, altitude_angle, field_of_view):
     focus_center = np.asarray(focus_center)
     assert focus_center.shape == (3,)
+
     view_dist_inverse = np.tan(field_of_view/2)
+    parallel = np.isclose(view_dist_inverse, 0)
+
+    transform = (
+        rot_4d_yz(altitude_angle) @
+        rot_4d_xy(circumference_angle) @
+        translation(*-focus_center)
+    )
+    if parallel:
+        transform = scale(1/focus_radius) @ transform
+    else:
+        transform = (
+            persp_matrix(view_dist_inverse) @
+            translation(0, 0, focus_radius / view_dist_inverse) @
+            transform
+        )
 
     points = t.faces.reshape(-1, 4)
-    pmin = points.min(axis=0)
-    pmax = points.max(axis=0)
-    rotation = rot_4d_yz(altitude_angle) @ rot_4d_xy(circumference_angle)
-    points = (
-        persp_matrix(view_dist_inverse) @
-        translation(0, 0, focus_radius / view_dist_inverse) @
-        rotation @
-        translation(*-focus_center) @
-        points.T).T
-    # Note that persp_matrix causes w-coordinates to be a linear scaling of the
-    # z-coordinates, so we only normalize x-, y-, w-coordinates.
-    # The z-coordinates are used for later z-ordering.
-    points[:, :2] /= points[:, 3:4]  # Normalize x and y
-    points[:, 3] = 1  # Normalize w
+    points = (transform @ points.T).T
+    if not parallel:
+        # Note that persp_matrix causes w-coordinates to be a linear scaling of
+        # the z-coordinates, so we only normalize x-, y-, w-coordinates.
+        # The z-coordinates are used for later z-ordering.
+        points[:, :2] /= points[:, 3:4]  # Normalize x and y
+        points[:, 3] = 1  # Normalize w
     faces = points.reshape(-1, 3, 4)
     return faces
