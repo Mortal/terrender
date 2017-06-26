@@ -48,13 +48,21 @@ def make_animation(t, matplotlib=False, debug_output=False, field_of_view=0.0, c
         pmin = t.faces.min(axis=(0, 1))
         pmax = t.faces.max(axis=(0, 1))
         center = pmin + (pmax - pmin) / 2
-        project_fun = functools.partial(
-            project_persp, focus_center=center[:3], focus_radius=(pmax-pmin)[:2].max(),
-            field_of_view=np.radians(field_of_view))
+        focus_radius = (pmax-pmin)[:2].max()
 
-        zmin = t.faces[:, :, 2].min()
-        zmax = t.faces[:, :, 2].max()
+        zmin = pmin[2]
+        zmax = pmax[2]
+        zscale = 0.5 * focus_radius / (zmax-zmin)
+        if zscale > 1:
+            t.faces[:, :, 2] *= zscale
+            zmin *= zscale
+            zmax *= zscale
+            center[2] *= zscale
         contour = (zmin + (zmax - zmin)/2, t.faces[:, :, 2])
+
+        project_fun = functools.partial(
+            project_persp, focus_center=center[:3], focus_radius=focus_radius,
+            field_of_view=np.radians(field_of_view))
 
         light = flat_shading(t, np.radians(30), np.radians(30))
 
@@ -62,7 +70,7 @@ def make_animation(t, matplotlib=False, debug_output=False, field_of_view=0.0, c
             n = 10
             for i in range(n):
                 with output.open_page() as page:
-                    faces = project_persp(t, center[:3], (pmax-pmin)[:2].max(),
+                    faces = project_persp(t, center[:3], focus_radius,
                                           0, 0, np.radians(i*field_of_view/n))
                     page.faces(z_order(faces), faces, light, contour=contour)
 
