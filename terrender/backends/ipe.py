@@ -6,49 +6,56 @@ class IpeOutputPage:
         assert self._parent._current_page is None
         print("Output page")
         self._parent._current_page = self
-        self._parent._write('<page>')
-        self._parent._write('<group matrix="256 0 0 256 288 688">')
+        self._parent._write(
+            '<page>\n<group matrix="256 0 0 256 288 688">')
         return self
 
     def __exit__(self, typ, val, tb):
         assert self._parent._current_page is self
         self._parent._current_page = None
-        self._parent._write('</group>')
-        self._parent._write('</page>')
+        self._parent._write(
+            '</group>\n</page>')
 
     def label(self, x, y, l):
-        write = self._parent._write
-        write('<group matrix="1 0 0 1 %.15f %.15f">' % (x, y))
-        write('<path fill="1">')
-        write('0 0 m')
-        write('0 0.015625 l')
-        write('0.046875 0.015625 l')
-        write('0.046875 0 l')
-        write('h')
-        write('</path>')
-        write('<text transformations="translations" ' +
-              'pos="0.00390625 0.001953125" stroke="0" ' +
-              'type="label" valign="baseline">' +
-              '\\tiny %s</text>' % l)
-        write('</group>')
+        self._parent._write('\n'.join([
+            '<group matrix="1 0 0 1 %.15f %.15f">' % (x, y),
+            '<path fill="1">',
+            '0 0 m',
+            '0 0.015625 l',
+            '0.046875 0.015625 l',
+            '0.046875 0 l',
+            'h',
+            '</path>',
+            '<text transformations="translations" ' +
+            'pos="0.00390625 0.001953125" stroke="0" ' +
+            'type="label" valign="baseline">' +
+            '\\tiny %s</text>' % l,
+            '</group>',
+        ]))
 
     def face(self, face, fill='1'):
-        write = self._parent._write
-        write('<path stroke="0" fill="%s">' % fill)
         assert len(face) == 3, len(face)
-        for i, p in enumerate(face):
-            command = 'm' if i == 0 else 'l'
-            write('%.15f %.15f %s' % (p[0], p[1], command))
-        write('h')
-        write('</path>')
+        commands = [
+            '%.15f %.15f %s' % (p[0], p[1], 'm' if i == 0 else 'l')
+            for i, p in enumerate(face)
+        ]
+        self._parent._write('\n'.join([
+            '<path stroke="0" fill="%s">' % fill,
+        ] + commands + [
+            'h',
+            '</path>',
+        ]))
 
     def polyline(self, coords, color='1 0 0'):
-        write = self._parent._write
-        write('<path stroke="%s">' % color)
-        for i, p in enumerate(coords):
-            command = 'm' if i == 0 else 'l'
-            write('%.15f %.15f %s' % (p[0], p[1], command))
-        write('</path>')
+        commands = [
+            '%.15f %.15f %s' % (p[0], p[1], 'm' if i == 0 else 'l')
+            for i, p in enumerate(coords)
+        ]
+        self._parent._write('\n'.join([
+            '<path stroke="%s">' % color,
+        ] + commands + [
+            '</path>',
+        ]))
 
     def face_contour(self, face, zs, contour):
         a = []
