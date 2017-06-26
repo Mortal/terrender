@@ -1,3 +1,4 @@
+import re
 try:
     import liblas
 except ImportError:
@@ -24,7 +25,29 @@ def get_points(filename, *, raw=False):
         return record_coordinates * scale + offset
 
 
+def get_rectangle(filename, x1, y1, x2, y2, n):
+    x1, x2 = min(x1, x2), max(x1, x2)
+    y1, y2 = min(y1, y2), max(y1, y2)
+    cache_file = '%s.%s,%s,%s,%s.%s.npz' % (filename, x1, y1, x2, y2, n)
+    try:
+        return np.load(cache_file)['points']
+    except FileNotFoundError:
+        pass
+    print('Load %s' % filename)
+    p = get_points(filename)
+    xs, ys, zs = p.T
+    b = (x1 <= xs) & (xs <= x2) & (y1 <= ys) & (ys <= y2)
+    result = p[b]
+    result = result[np.random.choice(len(result), n)]
+    print('Return', len(result), 'points')
+    np.savez_compressed(cache_file, points=result)
+    return result
+
+
 def get_sample(filename, n):
+    mo = re.match(r'^(.*),(\d+),(\d+),(\d+),(\d+)$', filename)
+    if mo:
+        return get_rectangle(mo.group(1), *map(int, mo.group(2, 3, 4, 5)), n)
     cache_file = '%s.%s.npz' % (filename, n)
     try:
         return np.load(cache_file)['points']
