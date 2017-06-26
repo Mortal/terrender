@@ -1,8 +1,14 @@
-import liblas
+try:
+    import liblas
+except ImportError:
+    print("Could not import liblas Python bindings.")
+    liblas = None
 import numpy as np
 
 
 def get_points(filename, *, raw=False):
+    if liblas is None:
+        raise Exception('liblas not installed')
     f = liblas.file.File(filename)
     print(len(f))
     record_coordinates = np.empty((len(f), 3), dtype=np.int32)
