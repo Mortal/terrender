@@ -3,7 +3,6 @@ import contextlib
 import numpy as np
 from terrender import predicates
 from terrender.cythonized import cythonized
-import time
 
 
 class SpaceOrder(enum.Enum):
@@ -110,10 +109,7 @@ def order_overlapping_triangles(faces):
 def z_order(faces):
     faces = np.asarray(faces)
     n = len(faces)
-    t1 = time.time()
     before_list = order_overlapping_triangles(faces)
-    t2 = time.time()
-    print(t2 - t1)
     before = {}
     for i, j in before_list:
         before.setdefault(i, []).append(j)
