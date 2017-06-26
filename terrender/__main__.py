@@ -14,14 +14,21 @@ from terrender.cythonized import go_compare
 
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument('-i', '--input-filename')
+    parser.add_argument('-n', '--point-count', type=int, default=100)
     parser.add_argument('-m', '--matplotlib', action='store_true')
     parser.add_argument('-d', '--debug-output', action='store_true')
     parser.add_argument('-f', '--field-of-view', type=float)
-    args = parser.parse_args()
+    args = vars(parser.parse_args())
 
-    # t = Terrain(get_sample())
-    t = Terrain.sobol(100)
-    make_animation(t, **vars(args))
+    n = args.pop('point_count')
+    filename = args.pop('input_filename')
+
+    if filename:
+        t = Terrain(get_sample(filename, n))
+    else:
+        t = Terrain.sobol(n)
+    make_animation(t, **args)
 
 
 def make_animation(t, matplotlib=False, debug_output=False, field_of_view=0.0):
