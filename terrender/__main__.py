@@ -18,6 +18,7 @@ def main():
     parser.add_argument('-n', '--point-count', type=int, default=100)
     parser.add_argument('-m', '--matplotlib', action='store_true')
     parser.add_argument('-d', '--debug-output', action='store_true')
+    parser.add_argument('-c', '--compare', action='store_true')
     parser.add_argument('-f', '--field-of-view', type=float, default=0.0)
     args = vars(parser.parse_args())
 
@@ -31,12 +32,14 @@ def main():
     make_animation(t, **args)
 
 
-def make_animation(t, matplotlib=False, debug_output=False, field_of_view=0.0):
+def make_animation(t, matplotlib=False, debug_output=False, field_of_view=0.0, compare=False):
     with contextlib.ExitStack() as stack:
         if debug_output:
             stack.enter_context(go_compare())
             stack.enter_context(
                 debug_output_to(stack.enter_context(IpeOutput('z_order.ipe'))))
+        elif compare:
+            stack.enter_context(go_compare())
         if matplotlib:
             output = stack.enter_context(PlotOutput())
         else:

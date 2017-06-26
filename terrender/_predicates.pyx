@@ -16,6 +16,12 @@ DEF BELOW = 2
 DEF DISJOINT = 3
 
 
+cdef extern from "rectangle_sweep.h":
+    void * rectangle_sweep_init()
+    long rectangle_sweep_push(void *, double, double, double, double, long, long *, long *)
+    void rectangle_sweep_free(void *)
+
+
 def rot_4d_xy(angle):
     s_angle = math.sin(angle)
     c_angle = math.cos(angle)
@@ -266,32 +272,61 @@ def order_overlapping_triangles(np.ndarray[DTYPE_t, ndim=3] faces):
         assert d == 4  # Homogenous 3D coordinates
         assert np.allclose(faces[:, :, 3], 1)  # Normalized
 
+    cdef np.ndarray[DTYPE_t] ys = faces[:, :, 1].min(axis=1)
+    cdef np.ndarray[Py_ssize_t] order = np.argsort(ys)
+    cdef np.ndarray[long] intersections = np.empty(n, np.intp)
+    cdef long * bbox_intersection_i1 = &intersections[0]
+    cdef long * bbox_intersection_i2 = bbox_intersection_i1 + n
+    cdef long n_intersections
+    cdef void * rectangle_sweep = rectangle_sweep_init()
+    cdef DTYPE_t x1, x2, y1, y2
+
     cdef Py_ssize_t output_size = 0
     cdef np.ndarray[Py_ssize_t, ndim=2] output_buffer = np.zeros((n*(n-1), 2), dtype=np.intp)
-    cdef Py_ssize_t i1, i2
+    cdef Py_ssize_t i1, i2, i3
     cdef int o
     cdef np.ndarray[DTYPE_t, ndim=2] coords_buffer = np.zeros((n*k, 2), dtype=DTYPE)
     # t1 = time.time()
-    for i1 in range(n):
+    for i1 in order:
+        x1 = float_min(float_min(
+            faces[i1, 0, 0], faces[i1, 1, 0]), faces[i1, 2, 0])
+        x2 = float_max(float_max(
+            faces[i1, 0, 0], faces[i1, 1, 0]), faces[i1, 2, 0])
+        y1 = float_min(float_min(
+            faces[i1, 0, 1], faces[i1, 1, 1]), faces[i1, 2, 1])
+        y2 = float_max(float_max(
+            faces[i1, 0, 1], faces[i1, 1, 1]), faces[i1, 2, 1])
+        n_intersections = rectangle_sweep_push(
+            rectangle_sweep, x1, x2, y1, y2, i1,
+            bbox_intersection_i1, bbox_intersection_i2)
+        if n_intersections < 0:
+            raise AssertionError(n_intersections)
+
+        for i2 in range(n_intersections):
+            for i3 in range(3):
+                coords_buffer[3*i2+i3, 0] = faces[intersections[i2], i3, 0]
+                coords_buffer[3*i2+i3, 1] = faces[intersections[i2], i3, 1]
         project_affine_2d_inplace(faces[i1, 0, :2],
                                   faces[i1, 1, :2],
                                   faces[i1, 2, :2],
-                                  faces[:, :, :2].reshape(n*k, 2).T,
+                                  coords_buffer.T,
                                   coords_buffer.T)
-        for i2 in range(n):
-            if i1 == i2:
-                continue
-            o = triangle_order(faces[i1], faces[i2], coords_buffer[3*i2:3*i2+3].T)
+        for i2 in range(n_intersections):
+            if i1 == intersections[i2]:
+                raise AssertionError('got self-intersection')
+            o = triangle_order(faces[i1], faces[intersections[i2]],
+                               coords_buffer[3*i2:3*i2+3].T)
             if o == DISJOINT:
                 continue
             elif o == BELOW:
-                output_buffer[output_size, 0] = i2
+                output_buffer[output_size, 0] = intersections[i2]
                 output_buffer[output_size, 1] = i1
                 output_size += 1
             else:
                 output_buffer[output_size, 0] = i1
-                output_buffer[output_size, 1] = i2
+                output_buffer[output_size, 1] = intersections[i2]
                 output_size += 1
     # t2 = time.time()
     # print(t2 - t1, (t2 - t1) / (n*n))
+    rectangle_sweep_free(rectangle_sweep)
     return np.array(output_buffer[:output_size])
