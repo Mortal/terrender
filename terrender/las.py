@@ -8,16 +8,23 @@ import numpy as np
 
 
 def get_points(filename, *, raw=False):
-    if liblas is None:
-        raise Exception('liblas not installed')
-    f = liblas.file.File(filename)
-    print(len(f))
-    record_coordinates = np.empty((len(f), 3), dtype=np.int32)
-    for row, point in zip(record_coordinates, f):
-        row[:] = [point.raw_x, point.raw_y, point.raw_z]
-    scale = np.array([f.header.scale], dtype=np.float64)
-    offset = np.array([f.header.offset], dtype=np.float64)
-    f.close()
+    if filename.endswith('.csv'):
+        record_coordinates = np.loadtxt(filename)
+        n, d = record_coordinates.shape
+        assert d == 3
+        scale = np.ones((1, d))
+        offset = np.zeros((1, d))
+    else:
+        if liblas is None:
+            raise Exception('liblas not installed')
+        f = liblas.file.File(filename)
+        print(len(f))
+        record_coordinates = np.empty((len(f), 3), dtype=np.int32)
+        for row, point in zip(record_coordinates, f):
+            row[:] = [point.raw_x, point.raw_y, point.raw_z]
+        scale = np.array([f.header.scale], dtype=np.float64)
+        offset = np.array([f.header.offset], dtype=np.float64)
+        f.close()
     assert scale.shape == offset.shape == (1, 3)
     if raw:
         return record_coordinates, scale, offset
@@ -56,6 +63,8 @@ def get_sample(filename, n):
     print('Load %s' % filename)
     p = get_points(filename)
     xs, ys, zs = p.T
+    if len(p) <= n:
+        return p
 
     print("Trim down %s points to just %s" % (len(p), n))
 
