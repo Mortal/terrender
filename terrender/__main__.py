@@ -28,7 +28,7 @@ def main():
     filename = args.pop('input_filename')
 
     if filename:
-        t = Terrain(get_sample(filename, n))
+        t = Terrain.triangulate_xyz(get_sample(filename, n))
     else:
         t = Terrain.sobol(n)
     make_animation(t, **args)
