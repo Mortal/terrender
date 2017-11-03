@@ -1,23 +1,49 @@
+import contextlib
+import collections
+
+
 class IpeOutputPage:
-    def __init__(self, parent: 'IpeOutput'):
+    def __init__(self, parent: 'IpeOutput', views=None):
         self._parent = parent
+        self._views = views
+        self._group = '<group layer="{}" matrix="256 0 0 256 288 688">'
 
     def __enter__(self):
         assert self._parent._current_page is None
         print("Output page")
         self._parent._current_page = self
-        self._parent._write(
-            '<page>\n<group matrix="256 0 0 256 288 688">')
+        self._parent._write('<page>')
+        if self._views is not None:
+            layers = collections.OrderedDict()
+            for view in self._views:
+                for layer in view:
+                    layers[layer] = layers.get(layer) or (layer == view[-1])
+            for layer in layers:
+                edit_no = '' if layers[layer] else ' edit="no"'
+                self._parent._write('<layer name="%s"%s/>' % (layer, edit_no))
+            for view in self._views:
+                self._parent._write('<view layers="%s" active="%s"/>' %
+                                    (' '.join(view), view[-1]))
+        # self._parent._write('<group matrix="256 0 0 256 288 688">')
         return self
 
     def __exit__(self, typ, val, tb):
         assert self._parent._current_page is self
         self._parent._current_page = None
-        self._parent._write(
-            '</group>\n</page>')
+        # self._parent._write('</group>')
+        self._parent._write('</page>')
 
-    def label(self, x, y, l):
+    @contextlib.contextmanager
+    def group(self):
+        self._parent._write('<group>')
+        try:
+            yield
+        finally:
+            self._parent._write('</group>')
+
+    def label(self, x, y, l, layer='alpha'):
         self._parent._write('\n'.join([
+            self._group.format(layer),
             '<group matrix="1 0 0 1 %.15f %.15f">' % (x, y),
             '<path fill="1">',
             '0 0 m',
@@ -31,33 +57,39 @@ class IpeOutputPage:
             'type="label" valign="baseline">' +
             '\\tiny %s</text>' % l,
             '</group>',
+            '</group>',
         ]))
 
-    def face(self, face, fill='1'):
+    def face(self, face, fill='1', layer='alpha'):
         assert len(face) == 3, len(face)
         commands = [
             '%.15f %.15f %s' % (p[0], p[1], 'm' if i == 0 else 'l')
             for i, p in enumerate(face)
         ]
         self._parent._write('\n'.join([
+            self._group.format(layer),
             '<path stroke="0" fill="%s">' % fill,
         ] + commands + [
             'h',
             '</path>',
+            '</group>',
         ]))
 
-    def polyline(self, coords, color='1 0 0'):
+    def transform(self, p):
+        return '%.15f %.15f' % (256*p[0]+288, 256*p[1]+688)
+
+    def polyline(self, coords, color='1 0 0', layer='alpha'):
         commands = [
-            '%.15f %.15f %s' % (p[0], p[1], 'm' if i == 0 else 'l')
+            '%s %s' % (self.transform(p), 'm' if i == 0 else 'l')
             for i, p in enumerate(coords)
         ]
         self._parent._write('\n'.join([
-            '<path stroke="%s">' % color,
+            '<path layer="%s" stroke="%s">' % (layer, color),
         ] + commands + [
             '</path>',
         ]))
 
-    def face_contour(self, face, zs, contour):
+    def face_contour(self, face, zs, contour, layer='alpha'):
         a = []
         b = []
         for i, z in enumerate(zs):
@@ -77,7 +109,7 @@ class IpeOutputPage:
                 x2, y2, *zw2 = face[i2]
                 p.append((x1 + c * (x2 - x1),
                           y1 + c * (y2 - y1)))
-            self.polyline(p)
+            self.polyline(p, layer=layer)
 
     def faces(self, order, faces, lightness=None, contour=None):
         for i in order:
@@ -85,8 +117,11 @@ class IpeOutputPage:
             l = lightness[i] if lightness is not None else 1 - min(i/4, 1) * .3
             self.face(face, l)
             if contour is not None:
-                threshold, orig_zs = contour
-                self.face_contour(face, orig_zs[i], threshold)
+                try:
+                    contour(self, face, i)
+                except TypeError:
+                    threshold, orig_zs = contour
+                    self.face_contour(face, orig_zs[i], threshold)
             # for i, p in enumerate(face):
             #     self.label(p[0], p[1], '%.0f' % (500 + 1000 * p[2]))
             # centroid = np.mean(face, axis=0)
@@ -119,5 +154,5 @@ class IpeOutput:
         if val is None:
             print("Done with", self._filename)
 
-    def open_page(self):
-        return IpeOutputPage(self)
+    def open_page(self, *args, **kwargs):
+        return IpeOutputPage(self, *args, **kwargs)
