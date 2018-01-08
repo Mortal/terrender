@@ -16,7 +16,7 @@ setup(name='terrender',
       description=headline,
       long_description=DESCRIPTION,
       author='https://github.com/Mortal',
-      url='https://github.com/Mortal/terrastream-scripts',
+      url='https://github.com/Mortal/terrender',
       packages=['terrender'],
       ext_modules=cythonize(extensions),
 )
