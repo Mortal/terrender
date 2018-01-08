@@ -1,0 +1,10 @@
+[package]
+name = "terrender"
+version = "0.2.0"
+authors = ["Mathias Rav <m@git.strova.dk>"]
+
+[dependencies]
+
+[lib]
+name = "terrender"
+crate-type = ["cdylib"]

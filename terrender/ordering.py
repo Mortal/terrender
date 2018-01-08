@@ -106,6 +106,36 @@ def order_overlapping_triangles(faces):
     return np.array(before).reshape(-1, 2)
 
 
+def native_order_overlapping_triangles(faces):
+    from ._native import lib, ffi
+
+    faces = np.asarray(faces)
+    n, k, d = faces.shape
+    assert k == 3  # Triangles
+    if d != 3:
+        assert d == 4  # Homogenous 3D coordinates
+        assert np.allclose(faces[:, :, 3], 1)  # Normalized
+
+    err = ffi.new('struct fstrie_error *')
+
+    faces = np.ascontiguousarray(faces[:, :, :3], np.double)
+    faces_ptr = faces.ctypes.data
+    assert ffi.typeof(faces_ptr) is ffi.typeof('double *')
+
+    output = np.zeros((n*(n-1), 2), dtype=np.uint64)
+    output_ptr = output.ctypes.data
+    assert ffi.typeof(output_ptr) is ffi.typeof('unsigned long *')
+
+    rv = lib.terrender_order_overlapping_triangles(
+        faces_ptr, faces.shape[0], output_ptr, output.shape[0], err)
+    if err[0].failed:
+        try:
+            raise Exception(ffi.string(err[0].message).decode('utf-8', 'replace'))
+        finally:
+            lib.terrender_free(err[0].message)
+    return output[:rv]
+
+
 def z_order(faces):
     faces = np.asarray(faces)
     n = len(faces)

@@ -96,6 +96,9 @@ def cythonized(fn, comparator=compare_results):
             return fn
 
         def wrapper(*args, **kwargs):
+            if not wrapper.called:
+                print("Call %s" % fn.__name__)
+                wrapper.called = True
             if _mode == SLOW:
                 return fn(*args, **kwargs)
             elif _mode == FAST:
@@ -107,6 +110,8 @@ def cythonized(fn, comparator=compare_results):
                 slow_result = fn(*args, **kwargs)
             comparator(fn.__name__, fast_result, slow_result)
             return fast_result
+
+        wrapper.called = False
 
         return wrapper
 
