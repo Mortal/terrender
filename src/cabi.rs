@@ -9,15 +9,15 @@ pub unsafe extern "C" fn terrender_init() {
     set_panic_hook();
 }
 
-unsafe fn get_vertex(vertex: *const c_double) -> Vertex {
-    Vertex(*vertex, *vertex.offset(1), *vertex.offset(2))
+unsafe fn get_vertex(vertex: *const c_double) -> Vertex3 {
+    Vertex3::new(*vertex, *vertex.offset(1), *vertex.offset(2))
 }
 
-unsafe fn get_face(face: *const c_double) -> Face {
-    Face(get_vertex(face), get_vertex(face.offset(3)), get_vertex(face.offset(6)))
+unsafe fn get_face(face: *const c_double) -> Face3 {
+    Face3::new(get_vertex(face), get_vertex(face.offset(3)), get_vertex(face.offset(6)))
 }
 
-unsafe fn get_faces(faces: *const c_double, nfaces: c_ulong) -> Vec<Face> {
+unsafe fn get_faces(faces: *const c_double, nfaces: c_ulong) -> Vec<Face3> {
     (0..nfaces).map(|i| get_face(faces.offset(9*i as isize))).collect::<Vec<_>>()
 }
 
