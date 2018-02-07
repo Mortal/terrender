@@ -2,23 +2,12 @@ use std::os::raw::{c_double, c_ulong};
 use bridge::*;
 use types::*;
 use predicates::order_overlapping_triangles;
+use err::Result;
 
 #[no_mangle]
 pub unsafe extern "C" fn terrender_init() {
     set_panic_hook();
 }
-
-// From https://youtu.be/zmtHaZG7pPc?t=22m09s
-#[macro_use]
-macro_rules! export (
-    ($n:ident($($an:ident: $aty:ty),*) -> Result<$rv:ty> $body:block) => (
-        #[no_mangle]
-        pub unsafe extern "C" fn $n($($an: $aty,)* err: *mut CError) -> $rv
-        {
-            landingpad(|| $body, err)
-        }
-    );
-);
 
 unsafe fn get_vertex(vertex: *const c_double) -> Vertex {
     Vertex(*vertex, *vertex.offset(1), *vertex.offset(2))

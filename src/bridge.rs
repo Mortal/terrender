@@ -1,10 +1,31 @@
-use std::{panic, mem};
-use std::os::raw::c_uint;
-use err::{Error, ErrorKind, Result};
+use std::{panic, mem, fmt};
+use std::os::raw::{c_uint, c_char};
+use std::ffi::CString;
+
+pub trait CError: fmt::Display {
+    fn get_error_code(&self) -> c_uint;
+}
+
+struct PanicError();
+
+impl fmt::Display for PanicError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match unsafe {&PANIC_INFO} {
+            &Some(ref s) => write!(f, "{}", s),
+            &None => write!(f, "no panic info"),
+        }
+    }
+}
+
+impl CError for PanicError {
+    fn get_error_code(&self) -> c_uint { 0 }
+}
+
+// use err::{Error, ErrorKind, Result};
 
 #[repr(C)]
-pub struct CError {
-    message: *mut u8,
+pub struct NativeError {
+    message: *mut c_char,
     failed: c_uint,
     code: c_uint,
 }
@@ -32,33 +53,59 @@ pub fn set_panic_hook() {
 }
 
 // From https://youtu.be/zmtHaZG7pPc?t=21m39s
-unsafe fn set_err(err: Error, err_out: *mut CError) {
+unsafe fn set_err(err: &CError, err_out: *mut NativeError) {
     if err_out.is_null() {
         return;
     }
-    let s = match err.kind {
-        ErrorKind::Internal => {
-            match &PANIC_INFO {
-                &Some(ref s) => format!("{}\x00", s),
-                &None => "no panic info\x00".to_owned(),
-            }
-        },
-        _ => format!("{}\x00", err),
-    };
-    (*err_out).message = Box::into_raw(s.into_boxed_str()) as *mut u8;
+    let s = CString::new(format!("{}", err)).unwrap_or_else(
+        |_| CString::new("<invalid error message>").unwrap());
+    (*err_out).message = s.into_raw();
     (*err_out).code = err.get_error_code();
     (*err_out).failed = 1;
 }
 // End from
 
 // From https://youtu.be/zmtHaZG7pPc?t=21m54s
-pub unsafe fn landingpad<F: FnOnce() -> Result<T> + panic::UnwindSafe, T>(
-    f: F, err_out: *mut CError) -> T
+pub unsafe fn landingpad<F: FnOnce() -> Result<T, E> + panic::UnwindSafe, T, E: CError>(
+    f: F, err_out: *mut NativeError) -> T
 {
     if let Ok(rv) = panic::catch_unwind(f) {
-        rv.map_err(|err| set_err(err, err_out)).unwrap_or(mem::zeroed())
+        rv.map_err(|err| set_err(&err, err_out)).unwrap_or(mem::zeroed())
     } else {
-        set_err(ErrorKind::Internal.into(), err_out);
+        set_err(&PanicError(), err_out);
         mem::zeroed()
     }
 }
+
+// From https://youtu.be/zmtHaZG7pPc?t=22m09s
+#[macro_use]
+macro_rules! export (
+    ($n:ident($($an:ident: $aty:ty),*) -> Result<$rv:ty> $body:block) => (
+        #[no_mangle]
+        pub unsafe extern "C" fn $n($($an: $aty,)* err: *mut NativeError) -> $rv
+        {
+            landingpad(|| { let e: Result<$rv> = $body; e }, err)
+        }
+    );
+);
+
+pub trait FromC<T> {
+    unsafe fn from_c(T) -> Self;
+}
+
+impl<T, U> FromC<T> for U where U: From<T> {
+    unsafe fn from_c(t: T) -> Self {
+        From::from(t)
+    }
+}
+
+#[allow(unused_macros)]
+#[macro_use]
+macro_rules! export_using_from_c (
+    ($n:ident($($an:ident: $aty:ty),*) -> Result<$rv:ty> = $fn:ident) => (
+        export!($n($($an: $aty),*) -> Result<$rv>
+        {
+            $fn($(FromC::from_c($an)),*)
+        });
+    );
+);

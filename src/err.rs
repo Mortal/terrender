@@ -1,5 +1,6 @@
 use std::{result, fmt};
 use std::os::raw::c_uint;
+use bridge::CError;
 
 #[derive(Debug)]
 pub enum ErrorKind {
@@ -34,8 +35,8 @@ impl Into<Error> for ErrorKind {
     }
 }
 
-impl Error {
-    pub fn get_error_code(&self) -> c_uint {
+impl CError for Error {
+    fn get_error_code(&self) -> c_uint {
         match self.kind {
             ErrorKind::Internal => 1,
             ErrorKind::Dummy => 2,
