@@ -17,10 +17,14 @@ unsafe fn get_face(face: *const c_double) -> Face {
     Face(get_vertex(face), get_vertex(face.offset(3)), get_vertex(face.offset(6)))
 }
 
+unsafe fn get_faces(faces: *const c_double, nfaces: c_ulong) -> Vec<Face> {
+    (0..nfaces).map(|i| get_face(faces.offset(9*i as isize))).collect::<Vec<_>>()
+}
+
 export!(terrender_order_overlapping_triangles(
         faces: *const c_double, nfaces: c_ulong,
         output: *mut c_ulong, output_size: c_ulong) -> Result<c_ulong> {
-    let faces = (0..nfaces).map(|i| get_face(faces.offset(9*i as isize))).collect::<Vec<_>>();
+    let faces = get_faces(faces, nfaces);
     let mut k = 0;
     let output_size = output_size as usize;
     order_overlapping_triangles(&faces, |i, j| {
