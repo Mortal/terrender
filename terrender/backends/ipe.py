@@ -1,5 +1,19 @@
+import os
+import re
+import zlib
+import base64
+import datetime
 import contextlib
 import collections
+import numpy as np
+
+
+PROG_NAME = 'terrender'
+
+
+def format_attrs(attrs):
+    return ''.join(' %s="%s"' % (k, v)
+                   for k, v in attrs.items() if v is not None)
 
 
 class IpeOutputPage:
@@ -34,8 +48,8 @@ class IpeOutputPage:
         self._parent._write('</page>')
 
     @contextlib.contextmanager
-    def group(self):
-        self._parent._write('<group>')
+    def group(self, **attrs):
+        self._parent._write('<group%s>' % format_attrs(attrs))
         try:
             yield
         finally:
@@ -60,7 +74,9 @@ class IpeOutputPage:
             '</group>',
         ]))
 
-    def face(self, face, fill='1', layer='alpha'):
+    def face(self, face, fill='1', layer='alpha', **attrs):
+        attrs['fill'] = fill
+        attrs.setdefault('stroke', 0)
         assert len(face) == 3, len(face)
         commands = [
             '%.15f %.15f %s' % (p[0], p[1], 'm' if i == 0 else 'l')
@@ -68,7 +84,7 @@ class IpeOutputPage:
         ]
         self._parent._write('\n'.join([
             self._group.format(layer),
-            '<path stroke="0" fill="%s">' % fill,
+            '<path%s>' % format_attrs(attrs),
         ] + commands + [
             'h',
             '</path>',
@@ -111,11 +127,12 @@ class IpeOutputPage:
                           y1 + c * (y2 - y1)))
             self.polyline(p, layer=layer)
 
-    def faces(self, order, faces, lightness=None, contour=None):
+    def faces(self, order, faces, lightness=None, contour=None, **attrs):
         for i in order:
             face = faces[i]
             l = lightness[i] if lightness is not None else 1 - min(i/4, 1) * .3
-            self.face(face, l)
+            attrs['fill'] = l
+            self.face(face, **attrs)
             if contour is not None:
                 try:
                     contour(self, face, i)
@@ -128,12 +145,40 @@ class IpeOutputPage:
             # self.label(centroid[0], centroid[1],
             #            '%.0f' % (500 + 1000 * centroid[2]))
 
+    def image(self, bitmap_id, x1, y1, x2, y2, **attrs):
+        assert x1 < x2
+        assert y1 < y2
+        # rect is lower left xy, upper right xy
+        attrs['rect'] = '%s %s %s %s' % (x1, y1, x2, y2)
+        attrs['bitmap'] = bitmap_id
+        self._parent._write('<image%s/>' % format_attrs(attrs))
+
 
 class IpeOutput:
+    def read_ipestyle(self, name='basic'):
+        filename = '/usr/share/ipe/%s/styles/%s.isy' % (
+            '.'.join(map(str, self._version)), name)
+        with open(filename) as fp:
+            xml_ver = fp.readline()
+            doctype = fp.readline()
+            assert xml_ver == '<?xml version="1.0"?>\n'
+            assert doctype == '<!DOCTYPE ipestyle SYSTEM "ipe.dtd">\n'
+            return fp.read().rstrip()
+
+    @classmethod
+    def find_version(cls):
+        mo = max((re.match(r'^(\d+)\.(\d+)\.(\d+)$', v)
+                  for v in os.listdir('/usr/share/ipe')),
+                 key=lambda mo: (mo is not None, mo and mo.group(0)))
+        return tuple(map(int, mo.group(1, 2, 3)))
+
     def __init__(self, filename):
         self._filename = filename
         self._fp = None
         self._current_page = None
+        self._version = self.find_version()
+        self._bitmaps = []
+        self._first = True
 
     def _write(self, line):
         print(line, file=self._fp)
@@ -142,9 +187,36 @@ class IpeOutput:
         assert self._fp is None
         print("Render", self._filename)
         self._fp = open(self._filename, 'w')
+        self._write('<?xml version="1.0"?>')
+        self._write('<!DOCTYPE ipe SYSTEM "ipe.dtd">')
+        version = '%d%02d%02d' % self._version
         from terrender import APP_NAME
-        self._write('<ipe version="70000" creator="%s">' % APP_NAME)
+        self._write('<ipe version="%s" creator="%s">' % (version, APP_NAME))
+        t = datetime.datetime.now().strftime('%Y%m%d%H%M%S')
+        self._write('<info created="D:%s" modified="D:%s"/>' % (t, t))
         return self
+
+    def add_bitmap(self, data):
+        assert data.dtype == np.uint8, data.dtype
+        bitmap_id = len(self._bitmaps) + 1
+        if data.ndim == 2:
+            height, width = data.shape
+            data = np.repeat(data, 3)
+        elif data.ndim == 3:
+            height, width, depth = data.shape
+            assert depth == 3, depth
+        data = data.tobytes()
+        data_compress = zlib.compress(data)
+        length = len(data_compress)
+        bitmap = (
+            '<bitmap id="{id}" ' +
+            'width="{width}" height="{height}" length="{length}" ' +
+            'ColorSpace="DeviceRGB" Filter="FlateDecode" ' +
+            'BitsPerComponent="8" encoding="base64">\n{data}\n</bitmap>'
+        ).format(width=width, height=height, length=length, id=bitmap_id,
+                 data=base64.b64encode(data_compress).decode('ascii'))
+        self._bitmaps.append(bitmap)
+        return bitmap_id
 
     def __exit__(self, typ, val, tb):
         assert self._fp is not None
@@ -155,4 +227,10 @@ class IpeOutput:
             print("Done with", self._filename)
 
     def open_page(self, *args, **kwargs):
+        if self._first:
+            for bitmap in self._bitmaps:
+                self._write(bitmap)
+            self._bitmaps = None
+            self._write(self.read_ipestyle())
+            self._first = False
         return IpeOutputPage(self, *args, **kwargs)
