@@ -42,10 +42,12 @@ class Terrain:
     @classmethod
     def triangulate_grid(cls, zz):
         height, width = zz.shape
-        yy, xx = np.meshgrid(np.arange(height), np.arange(width))
+        yy, xx = np.meshgrid(np.arange(width), np.arange(height))
         zs = zz.ravel()
+        data = np.array([yy, xx, zz, np.ones_like(xx)])
+        assert data.ndim == 3, (data.shape, data.dtype)
         xyzw = np.transpose(
-            [yy, xx, zz, np.ones_like(xx)],
+            data,
             (1, 2, 0))
         assert xyzw.shape == (height, width, 4)
         a = xyzw[:-1, :-1]
