@@ -111,17 +111,17 @@ class IpeOutputPage:
                           y1 + c * (y2 - y1)))
             self.polyline(p, layer=layer)
 
-    def faces(self, order, faces, lightness=None, contour=None):
+    def faces(self, order, faces, lightness=None, contour=()):
         for i in order:
             face = faces[i]
             l = lightness[i] if lightness is not None else 1 - min(i/4, 1) * .3
             self.face(face, l)
-            if contour is not None:
+            if contour:
                 try:
                     contour(self, face, i)
                 except TypeError:
-                    threshold, orig_zs = contour
-                    self.face_contour(face, orig_zs[i], threshold)
+                    for threshold, orig_zs in contour:
+                        self.face_contour(face, orig_zs[i], threshold)
             # for i, p in enumerate(face):
             #     self.label(p[0], p[1], '%.0f' % (500 + 1000 * p[2]))
             # centroid = np.mean(face, axis=0)

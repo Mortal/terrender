@@ -67,17 +67,21 @@ class Terrain:
         assert isinstance(tri, scipy.spatial.Delaunay)
         assert heights.shape == (tri.points.shape[0]-3,), (tri.points.shape, heights.shape)
         self.heights = heights
-        self.tri = tri
+        self.tri_points = tri.points
+        self.tri_vertices = tri.vertices
 
-        corners = sorted(np.ravel(self.tri.convex_hull).tolist())
+        corners = sorted(np.ravel(tri.convex_hull).tolist())
         assert corners == [0, 0, 1, 1, 2, 2], corners
 
-        bounded_face = np.min(self.tri.vertices, axis=1) > 2
-        face_indices = self.tri.vertices[bounded_face]
+        self.faces = self._compute_faces()
+
+    def _compute_faces(self):
+        bounded_face = np.min(self.tri_vertices, axis=1) > 2
+        face_indices = self.tri_vertices[bounded_face]
         assert len(unique_rows(face_indices)) == len(face_indices)
         face_indices = face_indices.ravel()
         assert face_indices.ndim == 1
-        face_points = self.tri.points[face_indices]
+        face_points = self.tri_points[face_indices]
         face_heights = self.heights[face_indices - 3]
         face_points_hom = np.concatenate(
             (face_points, face_heights.reshape(-1, 1),
@@ -85,4 +89,21 @@ class Terrain:
         n_points, ndim_hom = face_points_hom.shape
         assert n_points % 3 == 0
         assert ndim_hom == 4, ndim_hom
-        self.faces = face_points_hom.reshape((n_points // 3, 3, ndim_hom))
+        return face_points_hom.reshape((n_points // 3, 3, ndim_hom))
+
+    def find_by_z(self, z):
+        d, i = min((abs(z_ - z), i + 3) for i, z_ in enumerate(self.heights))
+        assert d < 1e-5
+        return i
+
+    def flip(self, i1, i2):
+        assert i1 != i2
+        tri1, tri2 = [i for i, face in enumerate(self.tri_vertices)
+                      if i1 in face and i2 in face]
+        v1, v2 = [v for tri in (self.tri_vertices[tri1], self.tri_vertices[tri2])
+                  for v in tri if v != i1 and v != i2]
+        if v1 not in self.tri_vertices[tri1]:
+            v1, v2 = v2, v1
+        self.tri_vertices[tri1] = [v2 if i == i2 else i for i in self.tri_vertices[tri1]]
+        self.tri_vertices[tri2] = [v1 if i == i1 else i for i in self.tri_vertices[tri2]]
+        self.faces = self._compute_faces()

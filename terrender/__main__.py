@@ -1,3 +1,4 @@
+import re
 import argparse
 import functools
 import contextlib
@@ -12,6 +13,13 @@ from terrender.las import get_sample
 from terrender.cythonized import go_compare
 
 
+def float_pair(s):
+    mo = re.match(r'^([-+]?[0-9.]*)-([-+]?[0-9.]*)$', s)
+    if not mo:
+        raise ValueError(s)
+    return tuple(map(float, mo.groups()))
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-i', '--input-filename')
@@ -20,21 +28,25 @@ def main():
     parser.add_argument('-d', '--debug-output', action='store_true')
     parser.add_argument('-c', '--compare', action='store_true')
     parser.add_argument('-f', '--field-of-view', type=float, default=0.0)
-    parser.add_argument('-z', '--contour-pos', type=float, default=0.5)
+    parser.add_argument('-z', '--contour-pos', type=float, action='append')
+    parser.add_argument('-l', '--flip', metavar='Z1-Z2', type=float_pair, action='append')
     parser.add_argument('-a', '--altitude', type=float, default=45)
     args = vars(parser.parse_args())
 
     n = args.pop('point_count')
     filename = args.pop('input_filename')
+    flip = args.pop('flip', ())
 
     if filename:
         t = Terrain.triangulate_xyz(get_sample(filename, n))
     else:
         t = Terrain.sobol(n)
+    for z1, z2 in flip:
+        t.flip(t.find_by_z(z1), t.find_by_z(z2))
     make_animation(t, **args)
 
 
-def make_animation(t, matplotlib=False, debug_output=False, field_of_view=0.0, compare=False, contour_pos=0.5, altitude=45):
+def make_animation(t, matplotlib=False, debug_output=False, field_of_view=0.0, compare=False, contour_pos=(), altitude=45):
     with contextlib.ExitStack() as stack:
         if debug_output:
             stack.enter_context(go_compare())
@@ -54,13 +66,16 @@ def make_animation(t, matplotlib=False, debug_output=False, field_of_view=0.0, c
 
         zmin = pmin[2]
         zmax = pmax[2]
-        zscale = 0.5 * focus_radius / (zmax-zmin)
+        zscale = max(1, 0.5 * focus_radius / (zmax-zmin))
         if zscale > 1:
             t.faces[:, :, 2] *= zscale
             zmin *= zscale
             zmax *= zscale
             center[2] *= zscale
-        contour = (zmin + (zmax - zmin) * contour_pos, t.faces[:, :, 2])
+        contour = [
+            (zmin + (zmax - zmin) * c if 0 < c < 1 else zscale * c, t.faces[:, :, 2])
+            for c in contour_pos
+        ]
 
         project_fun = functools.partial(
             project_persp, focus_center=center[:3], focus_radius=focus_radius,
