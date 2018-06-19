@@ -41,12 +41,12 @@ def main():
         t = Terrain.triangulate_xyz(get_sample(filename, n))
     else:
         t = Terrain.sobol(n)
-    for z1, z2 in flip:
+    for z1, z2 in flip or ():
         t.flip(t.find_by_z(z1), t.find_by_z(z2))
     make_animation(t, **args)
 
 
-def make_animation(t, matplotlib=False, debug_output=False, field_of_view=0.0, compare=False, contour_pos=(), altitude=45):
+def make_animation(t, matplotlib=False, debug_output=False, field_of_view=0.0, compare=False, contour_pos=None, altitude=45):
     with contextlib.ExitStack() as stack:
         if debug_output:
             stack.enter_context(go_compare())
@@ -74,7 +74,7 @@ def make_animation(t, matplotlib=False, debug_output=False, field_of_view=0.0, c
             center[2] *= zscale
         contour = [
             (zmin + (zmax - zmin) * c if 0 < c < 1 else zscale * c, t.faces[:, :, 2])
-            for c in contour_pos
+            for c in contour_pos or ()
         ]
 
         project_fun = functools.partial(
