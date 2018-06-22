@@ -6,7 +6,7 @@ import numpy as np
 from terrender.terrain import Terrain
 from terrender.backends.ipe import IpeOutput
 from terrender.backends.mpl import PlotOutput
-from terrender.projection import project_ortho, project_persp
+from terrender.projection import project_persp
 from terrender.ordering import z_order, debug_output_to
 from terrender.lighting import flat_shading
 from terrender.las import get_sample
@@ -88,30 +88,38 @@ def make_animation(t, matplotlib=False, debug_output=False, field_of_view=0.0, c
             n = 10
             for i in range(n):
                 with output.open_page() as page:
-                    faces = project_persp(t, center[:3], focus_radius,
+                    faces = project_persp(t.faces, center[:3], focus_radius,
                                           0, 0, np.radians(i*field_of_view/n))
                     page.faces(z_order(faces), faces, light, contour=contour)
 
         # with IpeOutput('order_z.ipe') as debug, debug_output_to(debug):
         #     with output.open_page() as page:
-        #         faces = project_fun(t, 2*np.pi*34/50, altitude_angle)
+        #         faces = project_fun(t.faces, 2*np.pi*34/50, altitude_angle)
         #         page.faces(z_order(faces), faces)
+
+        marks = np.array(
+            [[x, y, z]
+             for x in (np.min(t.faces[..., 0]), np.max(t.faces[..., 0]))
+             for y in (np.min(t.faces[..., 1]), np.max(t.faces[..., 1]))
+             for z in (np.min(t.faces[..., 2]), np.max(t.faces[..., 2]))])
 
         n = 10
         for i in range(n):
             with output.open_page() as page:
-                faces = project_fun(t, circumference_angle=0, altitude_angle=i*altitude_angle/n)
+                f = functools.partial(project_fun, circumference_angle=0, altitude_angle=i*altitude_angle/n)
+                faces = f(t.faces)
                 page.faces(z_order(faces), faces, light, contour=contour)
+                page.marks(f(marks))
         n = 50
         for i in range(n):
             with output.open_page() as page:
                 circ_angle = 2*np.pi*i/n
                 light = flat_shading(t, circ_angle + light_circumference_angle, np.radians(30))
-                faces = project_fun(t, circumference_angle=circ_angle, altitude_angle=altitude_angle)
+                faces = project_fun(t.faces, circumference_angle=circ_angle, altitude_angle=altitude_angle)
                 page.faces(z_order(faces), faces, light, contour=contour)
 
         n = 50
-        faces = project_fun(t, circumference_angle=0, altitude_angle=altitude_angle)
+        faces = project_fun(t.faces, circumference_angle=0, altitude_angle=altitude_angle)
         z = z_order(faces)
         for i in range(n):
             with output.open_page() as page:

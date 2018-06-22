@@ -68,8 +68,13 @@ def scale(s):
     ])
 
 
-def project_persp(t: 'Terrain', focus_center, focus_radius,
+def project_persp(points, focus_center, focus_radius,
                   circumference_angle, altitude_angle, field_of_view):
+    *ns, dim = points.shape
+    points = points.reshape((-1, dim))
+    if dim == 3:
+        points = np.concatenate((points, np.ones((points.shape[0], 1))), axis=1)
+    assert points.shape[1] == 4
     focus_center = np.asarray(focus_center)
     assert focus_center.shape == (3,)
 
@@ -92,7 +97,6 @@ def project_persp(t: 'Terrain', focus_center, focus_radius,
             transform
         )
 
-    points = t.faces.reshape(-1, 4)
     points = (transform @ points.T).T
     if not parallel:
         # Note that persp_matrix causes w-coordinates to be a linear scaling of
@@ -100,5 +104,8 @@ def project_persp(t: 'Terrain', focus_center, focus_radius,
         # The z-coordinates are used for later z-ordering.
         points[:, :2] /= points[:, 3:4]  # Normalize x and y
         points[:, 3] = 1  # Normalize w
-    faces = points.reshape(-1, 3, 4)
-    return faces
+    points = points.reshape(tuple(ns) + (4,))
+    if dim == 3:
+        points = points[..., :3]
+    assert points.shape == tuple(ns) + (dim,)
+    return points

@@ -1,5 +1,44 @@
+import os
+import re
+import datetime
 import contextlib
 import collections
+
+
+class IpeStyleMixin:
+    def read_ipestyle(self, name='basic'):
+        filename = '/usr/share/ipe/%s/styles/%s.isy' % (
+            '.'.join(map(str, self.ipe_version)), name)
+        with open(filename) as fp:
+            xml_ver = fp.readline()
+            doctype = fp.readline()
+            assert xml_ver == '<?xml version="1.0"?>\n'
+            assert doctype == '<!DOCTYPE ipestyle SYSTEM "ipe.dtd">\n'
+            return fp.read().rstrip()
+
+    def _find_version():
+        mo = max((re.match(r'^(\d+)\.(\d+)\.(\d+)$', v)
+                  for v in os.listdir('/usr/share/ipe')),
+                 key=lambda mo: (mo is not None, mo and mo.group(0)))
+        return tuple(map(int, mo.group(1, 2, 3)))
+
+    ipe_version = _find_version()
+
+    def get_preamble(self, prog_name=None):
+        if prog_name is None:
+            from terrender import APP_NAME as prog_name
+
+        version = '%d%02d%02d' % self.ipe_version
+        t = datetime.datetime.now().strftime('%Y%m%d%H%M%S')
+        return (
+            '<?xml version="1.0"?>\n' +
+            '<!DOCTYPE ipe SYSTEM "ipe.dtd">\n' +
+            '<ipe version="%s" creator="%s">\n' % (version, prog_name) +
+            '<info created="D:%s" modified="D:%s"/>\n' % (t, t)
+        )
+
+    def get_postamble(self):
+        return '</ipe>\n'
 
 
 class IpeOutputPage:
@@ -128,8 +167,18 @@ class IpeOutputPage:
             # self.label(centroid[0], centroid[1],
             #            '%.0f' % (500 + 1000 * centroid[2]))
 
+    def marks(self, points, layer='alpha'):
+        self._parent._write('\n'.join([
+            self._group.format(layer),
+        ] + [
+            '<use name="mark/disk(sx)" pos="%s %s" size="normal" stroke="black"/>' % (x, y)
+            for x, y, z in points
+        ] + [
+            '</group>',
+        ]))
 
-class IpeOutput:
+
+class IpeOutput(IpeStyleMixin):
     def __init__(self, filename):
         self._filename = filename
         self._fp = None
@@ -142,13 +191,12 @@ class IpeOutput:
         assert self._fp is None
         print("Render", self._filename)
         self._fp = open(self._filename, 'w')
-        from terrender import APP_NAME
-        self._write('<ipe version="70000" creator="%s">' % APP_NAME)
+        self._write(self.get_preamble() + self.read_ipestyle().rstrip('\n'))
         return self
 
     def __exit__(self, typ, val, tb):
         assert self._fp is not None
-        self._write('</ipe>')
+        self._write(self.get_postamble().rstrip('\n'))
         self._fp.close()
         self._fp = None
         if val is None:
