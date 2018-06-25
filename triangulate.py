@@ -11,8 +11,9 @@ from terrender.lighting import flat_shading
 def main():
     im = scipy.ndimage.imread('/home/rav/.openttd/scenario/heightmap/UNNAMED-291-267-70-64.png')
     assert im.shape == (64, 70), im.shape
+    im = im.T
     values = np.unique(im)
-    # im = im[20:40, 20:40]
+    # im = im[17:25, 20:25]
     im = np.searchsorted(values, im)
     im = im.astype(np.float32)
     t = Terrain.triangulate_grid(im)
@@ -51,7 +52,7 @@ def main():
         with output.open_page() as page:
             page.image(bitmap, 0, 244.359, 595, 597.641,
                        matrix='1 0 0 1 0 241.847')
-            faces = project_fun(t, circumference_angle=rot, altitude_angle=altitude_angle)
+            faces = project_fun(t.faces, circumference_angle=rot, altitude_angle=altitude_angle)
             with page.group(matrix='3.78083 0 0 3.78083 -1001.62 -1957.4'):
                 page.faces(z_order(faces), faces, light, contour=contour, stroke=None)
 

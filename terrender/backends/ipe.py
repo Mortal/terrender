@@ -16,6 +16,42 @@ def format_attrs(attrs):
                    for k, v in attrs.items() if v is not None)
 
 
+class IpeStyleMixin:
+    def read_ipestyle(self, name='basic'):
+        filename = '/usr/share/ipe/%s/styles/%s.isy' % (
+            '.'.join(map(str, self.ipe_version)), name)
+        with open(filename) as fp:
+            xml_ver = fp.readline()
+            doctype = fp.readline()
+            assert xml_ver == '<?xml version="1.0"?>\n'
+            assert doctype == '<!DOCTYPE ipestyle SYSTEM "ipe.dtd">\n'
+            return fp.read().rstrip()
+
+    def _find_version():
+        mo = max((re.match(r'^(\d+)\.(\d+)\.(\d+)$', v)
+                  for v in os.listdir('/usr/share/ipe')),
+                 key=lambda mo: (mo is not None, mo and mo.group(0)))
+        return tuple(map(int, mo.group(1, 2, 3)))
+
+    ipe_version = _find_version()
+
+    def get_preamble(self, prog_name=None):
+        if prog_name is None:
+            from terrender import APP_NAME as prog_name
+
+        version = '%d%02d%02d' % self.ipe_version
+        t = datetime.datetime.now().strftime('%Y%m%d%H%M%S')
+        return (
+            '<?xml version="1.0"?>\n' +
+            '<!DOCTYPE ipe SYSTEM "ipe.dtd">\n' +
+            '<ipe version="%s" creator="%s">\n' % (version, prog_name) +
+            '<info created="D:%s" modified="D:%s"/>\n' % (t, t)
+        )
+
+    def get_postamble(self):
+        return '</ipe>\n'
+
+
 class IpeOutputPage:
     def __init__(self, parent: 'IpeOutput', views=None):
         self._parent = parent
@@ -127,23 +163,33 @@ class IpeOutputPage:
                           y1 + c * (y2 - y1)))
             self.polyline(p, layer=layer)
 
-    def faces(self, order, faces, lightness=None, contour=None, **attrs):
+    def faces(self, order, faces, lightness=None, contour=(), **attrs):
         for i in order:
             face = faces[i]
             l = lightness[i] if lightness is not None else 1 - min(i/4, 1) * .3
             attrs['fill'] = l
             self.face(face, **attrs)
-            if contour is not None:
+            if contour:
                 try:
                     contour(self, face, i)
                 except TypeError:
-                    threshold, orig_zs = contour
-                    self.face_contour(face, orig_zs[i], threshold)
+                    for threshold, orig_zs in contour:
+                        self.face_contour(face, orig_zs[i], threshold)
             # for i, p in enumerate(face):
             #     self.label(p[0], p[1], '%.0f' % (500 + 1000 * p[2]))
             # centroid = np.mean(face, axis=0)
             # self.label(centroid[0], centroid[1],
             #            '%.0f' % (500 + 1000 * centroid[2]))
+
+    def marks(self, points, layer='alpha'):
+        self._parent._write('\n'.join([
+            self._group.format(layer),
+        ] + [
+            '<use name="mark/disk(sx)" pos="%s %s" size="normal" stroke="black"/>' % (x, y)
+            for x, y, z in points
+        ] + [
+            '</group>',
+        ]))
 
     def image(self, bitmap_id, x1, y1, x2, y2, **attrs):
         assert x1 < x2
@@ -154,29 +200,11 @@ class IpeOutputPage:
         self._parent._write('<image%s/>' % format_attrs(attrs))
 
 
-class IpeOutput:
-    def read_ipestyle(self, name='basic'):
-        filename = '/usr/share/ipe/%s/styles/%s.isy' % (
-            '.'.join(map(str, self._version)), name)
-        with open(filename) as fp:
-            xml_ver = fp.readline()
-            doctype = fp.readline()
-            assert xml_ver == '<?xml version="1.0"?>\n'
-            assert doctype == '<!DOCTYPE ipestyle SYSTEM "ipe.dtd">\n'
-            return fp.read().rstrip()
-
-    @classmethod
-    def find_version(cls):
-        mo = max((re.match(r'^(\d+)\.(\d+)\.(\d+)$', v)
-                  for v in os.listdir('/usr/share/ipe')),
-                 key=lambda mo: (mo is not None, mo and mo.group(0)))
-        return tuple(map(int, mo.group(1, 2, 3)))
-
+class IpeOutput(IpeStyleMixin):
     def __init__(self, filename):
         self._filename = filename
         self._fp = None
         self._current_page = None
-        self._version = self.find_version()
         self._bitmaps = []
         self._first = True
 
@@ -187,13 +215,7 @@ class IpeOutput:
         assert self._fp is None
         print("Render", self._filename)
         self._fp = open(self._filename, 'w')
-        self._write('<?xml version="1.0"?>')
-        self._write('<!DOCTYPE ipe SYSTEM "ipe.dtd">')
-        version = '%d%02d%02d' % self._version
-        from terrender import APP_NAME
-        self._write('<ipe version="%s" creator="%s">' % (version, APP_NAME))
-        t = datetime.datetime.now().strftime('%Y%m%d%H%M%S')
-        self._write('<info created="D:%s" modified="D:%s"/>' % (t, t))
+        self._write(self.get_preamble() + self.read_ipestyle().rstrip('\n'))
         return self
 
     def add_bitmap(self, data):
@@ -220,7 +242,7 @@ class IpeOutput:
 
     def __exit__(self, typ, val, tb):
         assert self._fp is not None
-        self._write('</ipe>')
+        self._write(self.get_postamble().rstrip('\n'))
         self._fp.close()
         self._fp = None
         if val is None:

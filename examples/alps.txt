@@ -1,0 +1,11 @@
+python -m terrender -i alps.csv -f 45 -z 10 -z 20 -z 30 -z 40 -z 50 -a 57 -l 17-52 -l 8-28 -l 31-37
+
+Original figure from M. de Berg and M. J. van Kreveld: "Trekking in the alps without freezing or getting tired" (in Proc. 1st ESA, 121–132, 1993).
+
+alps.csv extracted from digital version of P. K. Agarwal, S. Mukherjee and W. Zhang: "Contour Trees of Uncertain Terrains".
+
+commit 71511d75f969216d887749512ba35a4c83b349ec (HEAD -> master)
+Author: Mathias Rav <m@git.strova.dk>
+Date:   Wed Jun 13 11:07:39 2018 +0200
+
+    Add --flip and support for multiple --contour
