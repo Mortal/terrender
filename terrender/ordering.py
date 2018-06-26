@@ -103,7 +103,6 @@ def pure_python_order_overlapping_triangles(faces):
 
     # reshape to return empty (0, 2)-array instead of empty (0,)-array
     before = np.array(before).reshape(-1, 2)
-    assert sorted(before.tolist()) == sorted(native_order_overlapping_triangles(faces).tolist())
     return before
 
 
@@ -146,7 +145,9 @@ def z_order(faces):
                           for e in eval(s)
                           for n in e)
             print(exn)
-            return np.array(sorted(indices), np.intp)
+            indices = np.array(sorted(indices), np.intp)
+            print(repr(faces[indices]))
+            return indices
         raise
     before = {}
     for i, j in before_list:
