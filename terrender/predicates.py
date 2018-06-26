@@ -3,30 +3,30 @@ from terrender.cythonized import cythonized
 
 
 @cythonized
-def change_basis_2d_inplace(p1, p2, x):
+def change_basis_2d_inplace(p1, p2, x, output):
     p1, p2, x = np.asarray(p1), np.asarray(p2), np.asarray(x)
     assert p1.shape == p2.shape == (2,)
     assert 1 <= x.ndim <= 2
     assert x.shape[0] == 2
-    x[:] = np.linalg.inv(np.c_[p1, p2]) @ x
-    return x
+    output[:] = np.linalg.inv(np.c_[p1, p2]) @ x
+    return output
 
 
 def change_basis_2d(p1, p2, x):
-    c = change_basis_2d_inplace(p1, p2, np.array(x))
+    c = change_basis_2d_inplace(p1, p2, x, np.array(x))
     assert np.allclose(np.c_[p1, p2] @ c, x)
     return c
 
 
 @cythonized
-def project_affine_2d_inplace(p0, p1, p2, x):
+def project_affine_2d_inplace(p0, p1, p2, x, coords):
     p0, p1, p2 = np.asarray(p0), np.asarray(p1), np.asarray(p2)
     x = np.asarray(x)
     d, n = x.shape
     assert p0.shape == p1.shape == p2.shape == (2,)
     assert d == 2
-    x -= p0.reshape(d, 1)
-    coords = change_basis_2d_inplace(p1 - p0, p2 - p0, x)
+    coords[:] = x - p0.reshape(d, 1)
+    change_basis_2d_inplace(p1 - p0, p2 - p0, coords, coords)
     return coords
 
 
@@ -41,7 +41,7 @@ def project_affine_2d(p0, p1, p2, x):
     >>> print(project_affine_2d([1, 1], [1, 2], [2, 1], [[2], [3]]).T)
     [[ 2.  1.]]
     '''
-    coords = project_affine_2d_inplace(p0, p1, p2, np.array(x))
+    coords = project_affine_2d_inplace(p0, p1, p2, x, np.array(x))
     x2 = unproject_affine_2d(p0, p1, p2, coords)
     assert np.allclose(x2, x), (x, x2)
     return coords
