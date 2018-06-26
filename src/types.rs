@@ -1,10 +1,69 @@
 use std::fmt::Debug;
+use std::ops::{Add, Sub, Mul};
 
-pub trait Vertex: Debug + Clone {
-    type Value: Debug + Clone + PartialOrd;
+#[derive(Debug, Copy, Clone)]
+pub struct Point2 {
+    x: f64,
+    y: f64,
+}
 
+impl Point2 {
+    pub fn new(x: f64, y: f64) -> Self {
+        Point2 { x: x, y: y }
+    }
+}
+
+impl Add<Point2> for Point2 {
+    type Output = Point2;
+
+    fn add(self, other: Point2) -> Point2 {
+        Point2::new(self.x + other.x, self.y + other.y)
+    }
+}
+
+impl Sub<Point2> for Point2 {
+    type Output = Point2;
+
+    fn sub(self, other: Point2) -> Point2 {
+        Point2::new(self.x - other.x, self.y - other.y)
+    }
+}
+
+impl Mul<Point2> for f64 {
+    type Output = Point2;
+
+    fn mul(self, other: Point2) -> Point2 {
+        Point2::new(self * other.x, self * other.y)
+    }
+}
+
+pub trait Vertex: Debug + Clone
++ Add<Self, Output=Self>
++ Sub<Self, Output=Self>
+{
     fn min(&self, other: &Self) -> Self;
     fn max(&self, other: &Self) -> Self;
+
+    fn x(&self) -> f64;
+    fn y(&self) -> f64;
+    fn xy(&self) -> Point2;
+    fn with_point(&self, xy: Point2) -> Self;
+    fn with_xy(&self, x: f64, y: f64) -> Self;
+
+    fn scale(&self, a: f64) -> Self;
+}
+
+impl Vertex for Point2 {
+    fn min(&self, other: &Self) -> Self { Point2::new(self.x.min(other.x), self.y.min(other.y)) }
+    fn max(&self, other: &Self) -> Self { Point2::new(self.x.max(other.x), self.y.max(other.y)) }
+
+    fn x(&self) -> f64 { self.x }
+    fn y(&self) -> f64 { self.y }
+    fn xy(&self) -> Point2 { self.clone() }
+    fn with_point(&self, xy: Point2) -> Self { xy }
+    fn with_xy(&self, x: f64, y: f64) -> Self { Point2::new(x, y) }
+
+    fn scale(&self, a: f64) -> Self { Point2::new(a * self.x, a * self.y) }
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -33,11 +92,27 @@ impl Vertex3 {
     pub fn get(&self) -> (f64, f64, f64) {
         (self.x, self.y, self.z)
     }
+
+    pub fn z(&self) -> f64 { self.z }
+}
+
+impl Add<Vertex3> for Vertex3 {
+    type Output = Vertex3;
+
+    fn add(self, other: Vertex3) -> Vertex3 {
+        Vertex3::new(self.x + other.x, self.y + other.y, self.z + other.z)
+    }
+}
+
+impl Sub<Vertex3> for Vertex3 {
+    type Output = Vertex3;
+
+    fn sub(self, other: Vertex3) -> Vertex3 {
+        Vertex3::new(self.x - other.x, self.y - other.y, self.z - other.z)
+    }
 }
 
 impl Vertex for Vertex3 {
-    type Value = f64;
-
     fn min(&self, other: &Vertex3) -> Vertex3 {
         Vertex3 {
             x: finite_min(self.x, other.x),
@@ -53,6 +128,18 @@ impl Vertex for Vertex3 {
             z: finite_max(self.z, other.z),
         }
     }
+
+    fn x(&self) -> f64 { self.x }
+    fn y(&self) -> f64 { self.y }
+    fn xy(&self) -> Point2 { Point2::new(self.x, self.y) }
+    fn with_point(&self, xy: Point2) -> Vertex3 {
+        Vertex3::new(xy.x, xy.y, self.z)
+    }
+    fn with_xy(&self, x: f64, y: f64) -> Vertex3 {
+        Vertex3::new(x, y, self.z)
+    }
+
+    fn scale(&self, a: f64) -> Self { Vertex3::new(a * self.x, a * self.y, a * self.z) }
 }
 
 #[derive(Debug, Clone)]
@@ -79,6 +166,10 @@ impl<V: Vertex> Face<V> {
             hi: self.a.max(&self.b).max(&self.c),
         }
     }
+
+    pub fn a(&self) -> &V { &self.a }
+    pub fn b(&self) -> &V { &self.b }
+    pub fn c(&self) -> &V { &self.c }
 }
 
 pub type Face3 = Face<Vertex3>;
@@ -103,5 +194,9 @@ impl Rectangle3 {
 
     pub fn disjoint_xy(&self, other: &Rectangle3) -> bool {
         self.xs().disjoint(&other.xs()) || self.ys().disjoint(&other.ys())
+    }
+
+    pub fn behind(&self, other: &Rectangle3) -> bool {
+        self.hi.z < other.lo.z
     }
 }

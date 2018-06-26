@@ -1,8 +1,13 @@
 # setup.py based on https://github.com/getsentry/milksnake
 import os
 import re
+import numpy
 from setuptools import setup
 from terrender import DESCRIPTION
+
+from distutils.core import setup
+from distutils.extension import Extension
+from Cython.Build import cythonize
 
 
 NAME = 'terrender'
@@ -28,6 +33,10 @@ def build_native(spec):
     )
 
 
+sourcefiles = ['terrender/_predicates.pyx', 'terrender/rectangle_sweep.cpp']
+extensions = [Extension("terrender._predicates", sourcefiles, include_dirs=[numpy.get_include()])]
+
+
 setup(name=NAME,
       version=get_version(),
       description=headline,
@@ -43,4 +52,5 @@ setup(name=NAME,
       milksnake_tasks=[
           build_native,
       ],
+      ext_modules=cythonize(extensions),
 )

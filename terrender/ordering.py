@@ -2,7 +2,7 @@ import enum
 import contextlib
 import numpy as np
 from terrender import predicates
-from terrender.cythonized import cythonized
+from terrender.cythonized import cythonized, DifferentResults
 
 
 class SpaceOrder(enum.Enum):
@@ -58,8 +58,7 @@ def debug_output_to(output: 'IpeOutput'):
         DEBUG_OUTPUT = None
 
 
-@cythonized.edges
-def order_overlapping_triangles(faces):
+def pure_python_order_overlapping_triangles(faces):
     faces = np.asarray(faces)
     n, k, d = faces.shape
     assert k == 3  # Triangles
@@ -103,10 +102,13 @@ def order_overlapping_triangles(faces):
             before.append((i1, i2))
 
     # reshape to return empty (0, 2)-array instead of empty (0,)-array
-    return np.array(before).reshape(-1, 2)
+    before = np.array(before).reshape(-1, 2)
+    assert sorted(before.tolist()) == sorted(native_order_overlapping_triangles(faces).tolist())
+    return before
 
 
-def native_order_overlapping_triangles(faces):
+@cythonized.edges
+def order_overlapping_triangles(faces):
     from ._native import lib, ffi
 
     faces = np.asarray(faces)
@@ -116,18 +118,14 @@ def native_order_overlapping_triangles(faces):
         assert d == 4  # Homogenous 3D coordinates
         assert np.allclose(faces[:, :, 3], 1)  # Normalized
 
-    err = ffi.new('struct fstrie_error *')
+    err = ffi.new('struct terrender_error *')
 
     faces = np.ascontiguousarray(faces[:, :, :3], np.double)
-    faces_ptr = faces.ctypes.data
-    assert ffi.typeof(faces_ptr) is ffi.typeof('double *')
 
     output = np.zeros((n*(n-1), 2), dtype=np.uint64)
-    output_ptr = output.ctypes.data
-    assert ffi.typeof(output_ptr) is ffi.typeof('unsigned long *')
 
     rv = lib.terrender_order_overlapping_triangles(
-        faces_ptr, faces.shape[0], output_ptr, output.shape[0], err)
+        ffi.from_buffer(faces), faces.shape[0], ffi.from_buffer(output), output.shape[0], err)
     if err[0].failed:
         try:
             raise Exception(ffi.string(err[0].message).decode('utf-8', 'replace'))
@@ -139,7 +137,17 @@ def native_order_overlapping_triangles(faces):
 def z_order(faces):
     faces = np.asarray(faces)
     n = len(faces)
-    before_list = order_overlapping_triangles(faces)
+    try:
+        before_list = order_overlapping_triangles(faces)
+    except DifferentResults as exn:
+        if exn.args[1].startswith('['):
+            indices = set(n
+                          for s in exn.args[1:]
+                          for e in eval(s)
+                          for n in e)
+            print(exn)
+            return np.array(sorted(indices), np.intp)
+        raise
     before = {}
     for i, j in before_list:
         before.setdefault(i, []).append(j)

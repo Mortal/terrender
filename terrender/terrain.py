@@ -102,7 +102,7 @@ class Terrain:
         assert corners == [0, 0, 1, 1, 2, 2], corners
 
         bounded_face = np.min(tri.vertices, axis=1) > 2
-        tri_vertices = tri.vertices[bounded_face]
+        tri_vertices = tri.vertices[bounded_face] - 3
         assert len(unique_rows(tri_vertices)) == len(tri_vertices)
 
         return cls(tri.points[3:], heights, tri_vertices)
