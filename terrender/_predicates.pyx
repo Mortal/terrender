@@ -53,6 +53,8 @@ def change_basis_2d_inplace(np.ndarray[DTYPE_t] p1, np.ndarray[DTYPE_t] p2,
     #              ⎢─────────  ─────────⎥
     #              ⎣a⋅d - b⋅c  a⋅d - b⋅c⎦
     cdef DTYPE_t D = a * d - b * c
+    if D == 0:
+        raise TypeError((a, b, c, d))
     cdef Py_ssize_t i
     cdef DTYPE_t x1, x2
     for i in range(input.shape[1]):
