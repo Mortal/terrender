@@ -46,7 +46,7 @@ def main():
     make_animation(t, **args)
 
 
-def make_animation(t, matplotlib=False, debug_output=False, field_of_view=0.0, compare=False, contour_pos=None, altitude=45):
+def make_animation(t, matplotlib=False, debug_output=False, field_of_view=0.0, compare=False, contour_pos=None, altitude=45, light_circumference_angle=None, page_position=None, z_scale=None):
     with contextlib.ExitStack() as stack:
         if debug_output:
             stack.enter_context(go_compare())
@@ -66,34 +66,37 @@ def make_animation(t, matplotlib=False, debug_output=False, field_of_view=0.0, c
 
         zmin = pmin[2]
         zmax = pmax[2]
-        zscale = max(1, 0.5 * focus_radius / (zmax-zmin))
-        if zscale > 1:
-            t.faces[:, :, 2] *= zscale
-            zmin *= zscale
-            zmax *= zscale
-            center[2] *= zscale
+        if z_scale is None:
+            z_scale = max(1, 0.5 * focus_radius / (zmax-zmin))
+        if z_scale != 1:
+            t.faces[:, :, 2] *= z_scale
+            zmin *= z_scale
+            zmax *= z_scale
+            center[2] *= z_scale
         contour = [
-            (zmin + (zmax - zmin) * c if 0 < c < 1 else zscale * c, t.faces[:, :, 2])
+            (zmin + (zmax - zmin) * c if 0 < c < 1 else z_scale * c, t.faces[:, :, 2])
             for c in contour_pos or ()
         ]
+        print([a for a, b in contour])
 
         project_fun = functools.partial(
             project_persp, focus_center=center[:3], focus_radius=focus_radius,
             field_of_view=np.radians(field_of_view))
 
-        light_circumference_angle = np.radians(210)
+        if light_circumference_angle is None:
+            light_circumference_angle = np.radians(210)
         light = flat_shading(t, light_circumference_angle, np.radians(30))
 
         if field_of_view:
             n = 10
             for i in range(n):
-                with output.open_page() as page:
+                with output.open_page(page_position=page_position) as page:
                     faces = project_persp(t.faces, center[:3], focus_radius,
                                           0, 0, np.radians(i*field_of_view/n))
                     page.faces(z_order(faces), faces, light, contour=contour)
 
         # with IpeOutput('order_z.ipe') as debug, debug_output_to(debug):
-        #     with output.open_page() as page:
+        #     with output.open_page(page_position=page_position) as page:
         #         faces = project_fun(t.faces, 2*np.pi*34/50, altitude_angle)
         #         page.faces(z_order(faces), faces)
 
@@ -105,14 +108,14 @@ def make_animation(t, matplotlib=False, debug_output=False, field_of_view=0.0, c
 
         n = 10
         for i in range(n):
-            with output.open_page() as page:
+            with output.open_page(page_position=page_position) as page:
                 f = functools.partial(project_fun, circumference_angle=0, altitude_angle=i*altitude_angle/n)
                 faces = f(t.faces)
                 page.faces(z_order(faces), faces, light, contour=contour)
                 page.marks(f(marks))
         n = 50
         for i in range(n):
-            with output.open_page() as page:
+            with output.open_page(page_position=page_position) as page:
                 circ_angle = 2*np.pi*i/n
                 light = flat_shading(t, circ_angle + light_circumference_angle, np.radians(30))
                 faces = project_fun(t.faces, circumference_angle=circ_angle, altitude_angle=altitude_angle)
@@ -122,7 +125,7 @@ def make_animation(t, matplotlib=False, debug_output=False, field_of_view=0.0, c
         faces = project_fun(t.faces, circumference_angle=0, altitude_angle=altitude_angle)
         z = z_order(faces)
         for i in range(n):
-            with output.open_page() as page:
+            with output.open_page(page_position=page_position) as page:
                 circ_angle = 2*np.pi*i/n
                 light = flat_shading(t, circ_angle + light_circumference_angle, np.radians(30))
                 page.faces(z, faces, light, contour=contour)

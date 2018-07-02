@@ -34,6 +34,55 @@ struct AffineBasis<T: Vertex> {
     basis: LinearBasis<T>,
 }
 
+enum Edge {
+    Abscissa,
+    Ordinate,
+    Diagonal,
+}
+
+enum Sign {
+    Inside,
+    Boundary,
+    Outside,
+}
+
+impl Sign {
+    fn from_dist(d: f64) -> Self {
+        if is_close(d, 0.0) {
+            Sign::Boundary
+        } else if d < 0.0 {
+            Sign::Outside
+        } else {
+            Sign::Inside
+        }
+    }
+}
+
+struct FaceLocation {
+    edge: Edge,
+    dist: f64,
+}
+
+impl FaceLocation {
+    fn from_dists(abscissa: f64, ordinate: f64, diagonal: f64) -> Self {
+        FaceLocation { edge: Edge::Abscissa, dist: abscissa }
+        .min(FaceLocation { edge: Edge::Ordinate, dist: ordinate })
+        .min(FaceLocation { edge: Edge::Diagonal, dist: diagonal })
+    }
+
+    fn min(self, other: FaceLocation) -> Self {
+        if self.dist < other.dist {
+            self
+        } else {
+            other
+        }
+    }
+
+    fn sign(&self) -> Sign {
+        Sign::from_dist(self.dist)
+    }
+}
+
 impl<T: Vertex> AffineBasis<T> {
     fn onto(origin: &T, abscissa: &T, ordinate: &T) -> Self {
         AffineBasis {
@@ -55,9 +104,9 @@ impl<T: Vertex> AffineBasis<T> {
         self.origin.clone() + self.basis.unproject(p)
     }
 
-    // Negative: Not in triangle; Zero: On boundary; (0, 0.5]: Inside
-    fn in_triangle(&self, coords: Point2) -> f64 {
-        coords.x().min(coords.y()).min(1.0 - (coords.x() + coords.y()))
+    fn locate(&self, coords: Point2) -> FaceLocation {
+        FaceLocation::from_dists(
+            coords.x(), coords.y(), 1.0 - (coords.x() + coords.y()))
     }
 }
 
@@ -156,9 +205,10 @@ fn face_order(f1: &Face3, f2: &Face3) -> FaceOrder {
         }
     }
     for v in [a, b, c].iter() {
-        let inside = b1.in_triangle(v.xy());
-        if !is_close(inside, 0.0) && inside > 0.0 {
-            return FaceOrder::compare(b1.unproject(v.xy()).z(), v.z())
+        match b1.locate(v.xy()).sign() {
+            Sign::Inside =>
+                return FaceOrder::compare(b1.unproject(v.xy()).z(), v.z()),
+            _ => ()
         }
     }
     FaceOrder::Disjoint

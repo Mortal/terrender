@@ -1,0 +1,6 @@
+Implement something based on
+
+https://gamedev.stackexchange.com/questions/88060/triangle-triangle-intersection-code
+https://github.com/benardp/contours/blob/master/freestyle/view_map/triangle_triangle_intersection.c
+https://hal.inria.fr/inria-00072100/document
+Olivier Devillers, Philippe Guigue.  Faster Triangle-Triangle Intersection Tests.  RR-4488, INRIA. 2002. <inria-00072100>

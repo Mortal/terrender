@@ -53,10 +53,14 @@ class IpeStyleMixin:
 
 
 class IpeOutputPage:
-    def __init__(self, parent: 'IpeOutput', views=None):
+    def __init__(self, parent: 'IpeOutput', views=None, page_position=None):
         self._parent = parent
         self._views = views
-        self._group = '<group layer="{}" matrix="256 0 0 256 288 688">'
+        self._scale, self._ox, self._oy = page_position or (256, 288, 688)
+        self._group = (
+            '<group layer="{}" matrix="%g 0 0 %g %g %g">' %
+            (self._scale, self._scale, self._ox, self._oy)
+        )
 
     def __enter__(self):
         assert self._parent._current_page is None
@@ -128,7 +132,7 @@ class IpeOutputPage:
         ]))
 
     def transform(self, p):
-        return '%.15f %.15f' % (256*p[0]+288, 256*p[1]+688)
+        return '%.15f %.15f' % (self._scale*p[0]+self._ox, self._scale*p[1]+self._oy)
 
     def polyline(self, coords, color='1 0 0', layer='alpha'):
         commands = [
