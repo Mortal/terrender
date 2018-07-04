@@ -1,13 +1,8 @@
 # setup.py based on https://github.com/getsentry/milksnake
 import os
 import re
-import numpy
-from setuptools import setup
 from terrender import DESCRIPTION
-
-from distutils.core import setup
-from distutils.extension import Extension
-from Cython.Build import cythonize
+from setuptools import setup, Extension
 
 
 NAME = 'terrender'
@@ -33,11 +28,19 @@ def build_native(spec):
     )
 
 
-sourcefiles = ['terrender/_predicates.pyx', 'terrender/rectangle_sweep.cpp']
-extensions = [Extension("terrender._predicates", sourcefiles,
-                        include_dirs=[numpy.get_include()],
-                        extra_compile_args=['-static-libstdc++'],
-                        extra_link_args=['-static-libstdc++'])]
+if 'MANYLINUX' in os.environ:
+    # Disable Cython so that the wheel is 'py2.py3'
+    extensions = []
+else:
+    import numpy
+    from Cython.Build import cythonize
+
+    sourcefiles = ['terrender/_predicates.pyx', 'terrender/rectangle_sweep.cpp']
+    extensions = cythonize(
+        [Extension("terrender._predicates", sourcefiles,
+                   include_dirs=[numpy.get_include()],
+                   extra_compile_args=['-static-libstdc++'],
+                   extra_link_args=['-static-libstdc++'])])
 
 
 setup(name=NAME,
@@ -55,5 +58,5 @@ setup(name=NAME,
       milksnake_tasks=[
           build_native,
       ],
-      ext_modules=cythonize(extensions),
+      ext_modules=extensions,
 )

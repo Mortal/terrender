@@ -5,7 +5,13 @@
 set -e -x
 
 # Install dependencies needed by our wheel
-yum -y install libffi-devel
+yum -y install gcc libffi-devel
+
+export MANYLINUX=1
+
+# Disable the following since Cython modules make the wheel Python 2 specific...
+
+: <<EOF
 /opt/python/cp27-cp27mu/bin/pip install cython numpy
 
 # Install GCC 7.1 (https://github.com/Noctem/pogeo/blob/develop/travis/manylinux-build.sh)
@@ -22,10 +28,10 @@ fi
 curl -L "$TOOLCHAIN_URL" -o toolchain.tar.bz2
 tar -C / -xf toolchain.tar.bz2
 
-export MANYLINUX=1
 export PATH="/toolchain/bin:${PATH}"
 export CFLAGS="-I/toolchain/include ${MFLAG}"
 export CXXFLAGS="-I/toolchain/include ${MFLAG} -static-libstdc++"
+EOF
 
 # Install Rust
 curl https://sh.rustup.rs -sSf | sh -s -- -y
