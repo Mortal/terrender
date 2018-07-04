@@ -34,7 +34,10 @@ def build_native(spec):
 
 
 sourcefiles = ['terrender/_predicates.pyx', 'terrender/rectangle_sweep.cpp']
-extensions = [Extension("terrender._predicates", sourcefiles, include_dirs=[numpy.get_include()])]
+extensions = [Extension("terrender._predicates", sourcefiles,
+                        include_dirs=[numpy.get_include()],
+                        extra_compile_args=['-static-libstdc++'],
+                        extra_link_args=['-static-libstdc++'])]
 
 
 setup(name=NAME,
@@ -47,8 +50,8 @@ setup(name=NAME,
       include_package_data=True,
       zip_safe=False,
       platforms='any',
-      install_requires=['milksnake'],
-      setup_requires=['milksnake'],
+      install_requires=['numpy', 'milksnake'],
+      setup_requires=['numpy', 'milksnake'],
       milksnake_tasks=[
           build_native,
       ],

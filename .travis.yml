@@ -1,0 +1,27 @@
+notifications:
+  email: false
+matrix:
+  include:
+  - sudo: required
+    services:
+    - docker
+    env: DOCKER_IMAGE=quay.io/pypa/manylinux1_x86_64
+  - sudo: required
+    services:
+    - docker
+    env: DOCKER_IMAGE=quay.io/pypa/manylinux1_i686 PRE_CMD=linux32
+install:
+- docker pull $DOCKER_IMAGE
+script:
+- docker run --rm -v `pwd`:/work $DOCKER_IMAGE $PRE_CMD /work/travis/build-wheels.sh
+- ls wheelhouse/
+deploy:
+  provider: releases
+  api_key:
+    secure: Q2qM0nCxG07srQRrU9dC6qC8MBrRtFUZHvE+OlKmb1Jra9SpcxeKlZaOc14DGJKEaxcH9erTUuqkxvcm2xTzCfg956yIWHfj6yC8Jgo4XHi/0PE/ZW+NbcTirbPdb7mRuq1snmJvkprjv61rnm/H38kcCqq7Urzo42RLBngo1ujnXQp+mlzWRLcvj1X+NDThb3biJ15RnxfnsQbmrypt894OT3xW+oxSlo6EsBVR33DiJRuNVo+JEE2pRwbt4u+D58OR7Vs/YDIGZ050BE7acz/l/3/X/+k2yFOk+9ncVx+AdzTbulF+mBoMqz1dHYVoY7L9ha39pmhBnpKaQX8m2jDYC3pIfCeFdbbMKq7rr+wzsECxgMaBhOcjrPZu/h+qHNbsx+lOHjzCU6vFB+GUHCgjuqarSEwisNDxXq+KTmxdfmZQabsQtsJF8oIS1GoOQgT47h26Ho/ODq20oHxupYwnLtScsejAa+3iRn2zFzODRKm84dvXONHPUsOI6SZ8CWpZbGnhdMHY+ayyuDFPA8/CJrzjFN4tqQKcfmSpvw0pK42Ivn8yNJ8qNvNHD4nEMJMcSpuk2GJ5CE9OgPr4/0glV2LTLBje03xS1rZq2CEDzAVvh4uTRyDY+APULByQqgoSD1DRnI+Qw7y0yeLNl3UM/cqWfEJ2MsMrNpnZz+E=
+  skip_cleanup: true
+  file_glob: true
+  file: wheelhouse/terrender-*.whl
+  on:
+    repo: Mortal/terrender
+    tags: true
