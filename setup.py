@@ -2,7 +2,7 @@
 import os
 import re
 from terrender import DESCRIPTION
-from setuptools import setup, Extension
+from setuptools import setup, Extension, find_packages
 
 
 NAME = 'terrender'
@@ -49,7 +49,7 @@ setup(name=NAME,
       long_description=DESCRIPTION,
       author='https://github.com/Mortal',
       url='https://github.com/Mortal/%s' % NAME,
-      packages=[NAME],
+      packages=find_packages(include=[NAME, NAME + '.*']),
       include_package_data=True,
       zip_safe=False,
       platforms='any',
