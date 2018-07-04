@@ -29,8 +29,8 @@ export!(terrender_order_overlapping_triangles(
     let output_size = output_size as usize;
     order_overlapping_triangles(&faces, |i, j| {
         if k < output_size {
-            *output.offset((2*k) as isize) = i as u64;
-            *output.offset((2*k+1) as isize) = j as u64;
+            *output.offset((2*k) as isize) = i as c_ulong;
+            *output.offset((2*k+1) as isize) = j as c_ulong;
             k += 1;
         }
     });
