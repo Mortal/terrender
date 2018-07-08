@@ -8,13 +8,13 @@ fn is_close(a: f64, b: f64) -> bool {
 }
 
 // Determinant. Positive iff c is left of the line from a to b.
-fn orient<V: Vertex>(a: &V, b: &V, c: &V) -> f64 {
+fn determinant<V: Vertex>(a: &V, b: &V, c: &V) -> f64 {
     (a.x() - c.x()) * (b.y() - c.y()) - (a.y() - c.y()) * (b.x() - c.x())
 }
 
 // Negative iff face is ordered counter-clockwise.
 fn orient_face<V: Vertex>(f: &Face<V>) -> f64 {
-    orient(f.a(), f.b(), f.c())
+    determinant(f.a(), f.b(), f.c())
 }
 
 struct LinearBasis<T: Vertex> {
@@ -199,9 +199,9 @@ fn face_order_edge(f1: &Face3, p2: &Vertex3, q2: &Vertex3, r2: &Vertex3) -> Face
     let p1 = f1.a();
     let q1 = f1.b();
     let r1 = f1.c();
-    assert!(orient(p2, q2, p1) >= 0.0);
-    assert!(orient(q2, r2, p1) >= 0.0);
-    assert!(orient(r2, p2, p1) < 0.0);
+    assert!(determinant(p2, q2, p1) >= 0.0);
+    assert!(determinant(q2, r2, p1) >= 0.0);
+    assert!(determinant(r2, p2, p1) < 0.0);
     panic!("Not implemented")
 }
 
@@ -209,76 +209,218 @@ fn face_order_vertex(f1: &Face3, p2: &Vertex3, q2: &Vertex3, r2: &Vertex3) -> Fa
     let p1 = f1.a();
     let q1 = f1.b();
     let r1 = f1.c();
-    assert!(orient(p2, q2, p1) >= 0.0);
-    assert!(orient(q2, r2, p1) < 0.0);
-    assert!(orient(r2, p2, p1) < 0.0);
+    assert!(determinant(p2, q2, p1) >= 0.0);
+    assert!(determinant(q2, r2, p1) < 0.0);
+    assert!(determinant(r2, p2, p1) < 0.0);
     panic!("Not implemented")
 }
 
+#[derive(PartialEq)]
+enum TriangleCorner {
+    A, B, C
+}
+
+enum FaceOrientation {
+    // x is inside
+    Inside,
+    // x is on corner
+    OnVertex(TriangleCorner),
+    // x is on opposite edge
+    OnEdge(TriangleCorner),
+    // x is left of opposite edge, but not adjacents
+    OutsideVertex(TriangleCorner),
+    // x is left of adjacent edges, but not opposite
+    OutsideEdge(TriangleCorner),
+}
+
+impl FaceOrientation {
+    fn on_a(f: &Face3) -> Self { FaceOrientation::OnVertex(TriangleCorner::A) }
+    fn on_b(f: &Face3) -> Self { FaceOrientation::OnVertex(TriangleCorner::B) }
+    fn on_c(f: &Face3) -> Self { FaceOrientation::OnVertex(TriangleCorner::C) }
+    fn on_ab(f: &Face3) -> Self { FaceOrientation::OnEdge(TriangleCorner::C) }
+    fn on_bc(f: &Face3) -> Self { FaceOrientation::OnEdge(TriangleCorner::A) }
+    fn on_ca(f: &Face3) -> Self { FaceOrientation::OnEdge(TriangleCorner::B) }
+    fn left_of_ab(f: &Face3) -> Self { FaceOrientation::OutsideVertex(TriangleCorner::C) }
+    fn left_of_bc(f: &Face3) -> Self { FaceOrientation::OutsideVertex(TriangleCorner::A) }
+    fn left_of_ca(f: &Face3) -> Self { FaceOrientation::OutsideVertex(TriangleCorner::B) }
+    fn not_left_of_ab(f: &Face3) -> Self { FaceOrientation::OutsideEdge(TriangleCorner::C) }
+    fn not_left_of_bc(f: &Face3) -> Self { FaceOrientation::OutsideEdge(TriangleCorner::A) }
+    fn not_left_of_ca(f: &Face3) -> Self { FaceOrientation::OutsideEdge(TriangleCorner::B) }
+}
+
+fn on_left(p: &Vertex3, q: &Vertex3, r: &Vertex3) -> Sign {
+    Sign::from_dist(determinant(p, q, r))
+}
+
+fn face_orient(face: &Face3, x: &Vertex3) -> Result<FaceOrientation, String> {
+    match (on_left(face.a(), face.b(), x),
+           on_left(face.b(), face.c(), x),
+           on_left(face.c(), face.a(), x)) {
+        (Sign::Inside, Sign::Inside, Sign::Inside) =>
+            Ok(FaceOrientation::Inside),
+        (Sign::Boundary, Sign::Inside, Sign::Boundary) =>
+            Ok(FaceOrientation::on_a(face)),
+        (Sign::Boundary, Sign::Boundary, Sign::Inside) =>
+            Ok(FaceOrientation::on_b(face)),
+        (Sign::Inside, Sign::Boundary, Sign::Boundary) =>
+            Ok(FaceOrientation::on_c(face)),
+        (Sign::Boundary, Sign::Inside, Sign::Inside) =>
+            Ok(FaceOrientation::on_ab(face)),
+        (Sign::Inside, Sign::Boundary, Sign::Inside) =>
+            Ok(FaceOrientation::on_bc(face)),
+        (Sign::Inside, Sign::Inside, Sign::Boundary) =>
+            Ok(FaceOrientation::on_ca(face)),
+        (Sign::Inside, Sign::Boundary, Sign::Outside) =>
+            Ok(FaceOrientation::left_of_ab(face)),
+        (Sign::Inside, Sign::Outside, Sign::Boundary) =>
+            Ok(FaceOrientation::left_of_ab(face)),
+        (Sign::Inside, Sign::Outside, Sign::Outside) =>
+            Ok(FaceOrientation::left_of_ab(face)),
+        (Sign::Boundary, Sign::Inside, Sign::Outside) =>
+            Ok(FaceOrientation::left_of_bc(face)),
+        (Sign::Outside, Sign::Inside, Sign::Boundary) =>
+            Ok(FaceOrientation::left_of_bc(face)),
+        (Sign::Outside, Sign::Inside, Sign::Outside) =>
+            Ok(FaceOrientation::left_of_bc(face)),
+        (Sign::Boundary, Sign::Outside, Sign::Inside) =>
+            Ok(FaceOrientation::left_of_ca(face)),
+        (Sign::Outside, Sign::Boundary, Sign::Inside) =>
+            Ok(FaceOrientation::left_of_ca(face)),
+        (Sign::Outside, Sign::Outside, Sign::Inside) =>
+            Ok(FaceOrientation::left_of_ca(face)),
+        (Sign::Outside, Sign::Inside, Sign::Inside) =>
+            Ok(FaceOrientation::not_left_of_ab(face)),
+        (Sign::Inside, Sign::Outside, Sign::Inside) =>
+            Ok(FaceOrientation::not_left_of_bc(face)),
+        (Sign::Inside, Sign::Inside, Sign::Outside) =>
+            Ok(FaceOrientation::not_left_of_ca(face)),
+        (Sign::Boundary, Sign::Boundary, Sign::Boundary) =>
+            Err(format!("face is flat: {:?}", face)),
+        (Sign::Boundary, Sign::Boundary, Sign::Outside) =>
+            Err(format!("face is clockwise: {:?}", face)),
+        (Sign::Boundary, Sign::Outside, Sign::Boundary) =>
+            Err(format!("face is clockwise: {:?}", face)),
+        (Sign::Boundary, Sign::Outside, Sign::Outside) =>
+            Err(format!("face is clockwise: {:?}", face)),
+        (Sign::Outside, Sign::Boundary, Sign::Boundary) =>
+            Err(format!("face is clockwise: {:?}", face)),
+        (Sign::Outside, Sign::Boundary, Sign::Outside) =>
+            Err(format!("face is clockwise: {:?}", face)),
+        (Sign::Outside, Sign::Outside, Sign::Boundary) =>
+            Err(format!("face is clockwise: {:?}", face)),
+        (Sign::Outside, Sign::Outside, Sign::Outside) =>
+            Err(format!("face is clockwise: {:?}", face)),
+    }
+}
+
+// f2 has a vertex on c1 and a vertex on c2
+fn overlap_point_incident_edge(f1: &Face3, f2: &Face3, c1: TriangleCorner, c2: TriangleCorner, o3: FaceOrientation) -> Option<Vertex3> {
+    assert!(c1 != c2);
+    match o3 {
+        FaceOrientation::Inside => panic!("Inside should be handled in overlap_point"),
+        FaceOrientation::OnEdge(_) => panic!("OnEdge should be handled in overlap_point"),
+        FaceOrientation::OnVertex(c3) => {
+            assert!(c1 != c3);
+            assert!(c2 != c3);
+            Some(f2.midpoint())
+        },
+        FaceOrientation::OutsideVertex(c3) => {
+            if c1 != c3 && c2 != c3 {
+                Some(f1.midpoint())
+            } else {
+                None
+            }
+        },
+        FaceOrientation::OutsideEdge(c3) => {
+            if c1 != c3 && c2 != c3 {
+                None
+            } else {
+                Some(f1.midpoint())
+            }
+        },
+    }
+}
+
+// f2 has a vertex on c1
+fn overlap_point_incident_vertex(f1: &Face3, f2: &Face3, c1: TriangleCorner, o2: FaceOrientation, o3: FaceOrientation) -> Option<Vertex3> {
+    match (o2, o3) {
+        (FaceOrientation::OutsideVertex(c2),
+         FaceOrientation::OutsideVertex(c3)) =>
+            if c1 != c2 && c2 != c3 && c3 != c1 {
+                Some(f1.midpoint())
+            } else {
+                None
+            }
+        (FaceOrientation::OutsideVertex(c2),
+         FaceOrientation::OutsideEdge(c3)) =>
+            panic!("TODO"),
+        (FaceOrientation::OutsideEdge(c2),
+         FaceOrientation::OutsideVertex(c3)) =>
+            panic!("TODO"),
+        (FaceOrientation::OutsideEdge(c2),
+         FaceOrientation::OutsideEdge(c3)) =>
+            panic!("TODO"),
+        _ => panic!("Remaining cases should be handled by overlap_point"),
+    }
+}
+
+fn overlap_point(f1: &Face3, f2: &Face3) -> Option<Vertex3> {
+    match (face_orient(f1, f2.a()).unwrap(),
+           face_orient(f1, f2.b()).unwrap(),
+           face_orient(f1, f2.c()).unwrap()) {
+        (FaceOrientation::Inside, _, _) =>
+            // f2.a() is a proper overlap point
+            Some(f2.a().clone()),
+        (FaceOrientation::OnEdge(_), _, _) =>
+            // f2.a() is not really a proper overlap point,
+            // but in terrender, a 3D vertex is never contained in a 3D edge,
+            // so we can determine z-order by using f2.a() as overlap point.
+            // TODO: Find proper overlap point in this case.
+            Some(f2.a().clone()),
+        (_, FaceOrientation::Inside, _) =>
+            Some(f2.b().clone()),
+        (_, FaceOrientation::OnEdge(_), _) =>
+            Some(f2.b().clone()),
+        (_, _, FaceOrientation::Inside) =>
+            Some(f2.c().clone()),
+        (_, _, FaceOrientation::OnEdge(_)) =>
+            Some(f2.c().clone()),
+        (FaceOrientation::OnVertex(c1),
+         FaceOrientation::OnVertex(c2),
+         o3) =>
+            overlap_point_incident_edge(f1, f2, c1, c2, o3),
+        (FaceOrientation::OnVertex(c1),
+         o2,
+         FaceOrientation::OnVertex(c3)) =>
+            overlap_point_incident_edge(f1, f2, c3, c1, o2),
+        (o1,
+         FaceOrientation::OnVertex(c2),
+         FaceOrientation::OnVertex(c3)) =>
+            overlap_point_incident_edge(f1, f2, c2, c3, o1),
+        (FaceOrientation::OnVertex(c1), o2, o3) =>
+            overlap_point_incident_vertex(f1, f2, c1, o2, o3),
+        (o1, FaceOrientation::OnVertex(c2), o3) =>
+            overlap_point_incident_vertex(f1, f2, c2, o3, o1),
+        (o1, o2, FaceOrientation::OnVertex(c3)) =>
+            overlap_point_incident_vertex(f1, f2, c3, o1, o2),
+        _ => panic!("TODO"),
+        // FaceOrientation::OnVertex(c1) => panic!("TODO"),
+        // FaceOrientation::OutsideVertex(c1) => panic!("TODO"),
+        // FaceOrientation::OutsideEdge(c1) => panic!("TODO"),
+    }
+}
+
 fn face_order(f1: &Face3, f2: &Face3) -> FaceOrder {
-    assert!(orient_face(f1) < 0.0, "f1 not CCW: {:?}", f1);
-    assert!(orient_face(f2) < 0.0, "f2 not CCW: {:?}", f2);
     if f1.bbox().disjoint_xy(&f2.bbox()) {
         return FaceOrder::Disjoint;
     }
-    let p1 = f1.a();
-    let q1 = f1.b();
-    let r1 = f1.c();
-    let p2 = f2.a();
-    let q2 = f2.b();
-    let r2 = f2.c();
-    if orient(p2, q2, p1) >= 0.0 {
-        if orient(q2, r2, p1) >= 0.0 {
-            if orient(r2, p2, p1) >= 0.0 {
-                panic!("p1 is inside f2")
-            } else {
-                // p1 in R1
-                face_order_edge(f1, p2, q2, r2)
-            }
-        } else {
-            if orient(r2, p2, p1) >= 0.0 {
-                face_order_edge(f1, r2, p2, q2)
-            } else {
-                face_order_vertex(f1, p2, q2, r2)
-            }
-        }
-    } else {
-        if orient(q2, r2, p1) >= 0.0 {
-            if orient(r2, p2, p1) >= 0.0 {
-                face_order_edge(f1, q2, r2, p2)
-            } else {
-                face_order_vertex(f1, q2, r2, p2)
-            }
-        } else {
-            face_order_vertex(f1, r2, p2, q2)
-        }
-    }
-
-    /*
-    let b1 = AffineBasis::onto_face(f1);
-    let a = f2.a().with_point(b1.project(f2.a()));
-    let b = f2.b().with_point(b1.project(f2.b()));
-    let c = f2.c().with_point(b1.project(f2.c()));
-    for e in [Edge2::new(a, b), Edge2::new(b, c), Edge2::new(c, a)].iter() {
-        for option_intersection in [e.x_intersection(), e.y_intersection(), e.diagonal_intersection()].iter() {
-            if let &Some(intersection) = option_intersection {
-                let z1 = b1.unproject(intersection.xy()).z();
-                let z2 = intersection.z();
-                if !is_close(z1, z2) {
-                    return FaceOrder::compare(z1, z2);
-                }
-            }
-        }
-    }
-    for v in [a, b, c].iter() {
-        match b1.locate(v.xy()).sign() {
-            Sign::Inside =>
-                return FaceOrder::compare(b1.unproject(v.xy()).z(), v.z()),
-            _ => ()
-        }
+    if let Some(p) = overlap_point(f1, f2) {
+        let b1 = AffineBasis::onto_face(f1);
+        let z1 = b1.unproject(p.xy()).z();
+        let z2 = p.z();
+        return FaceOrder::compare(z1, z2);
     }
     FaceOrder::Disjoint
-    */
 }
 
 pub fn order_overlapping_triangles<F: FnMut(usize, usize) -> ()>(faces: &[Face3], mut before: F) {

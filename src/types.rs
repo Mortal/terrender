@@ -1,5 +1,5 @@
 use std::fmt::Debug;
-use std::ops::{Add, Sub, Mul};
+use std::ops::{Add, Sub, Mul, Div};
 
 #[derive(Debug, Copy, Clone)]
 pub struct Point2 {
@@ -112,6 +112,14 @@ impl Sub<Vertex3> for Vertex3 {
     }
 }
 
+impl Div<f64> for Vertex3 {
+    type Output = Vertex3;
+
+    fn div(self, denom: f64) -> Vertex3 {
+        Vertex3::new(self.x / denom, self.y / denom, self.z / denom)
+    }
+}
+
 impl Vertex for Vertex3 {
     fn min(&self, other: &Vertex3) -> Vertex3 {
         Vertex3 {
@@ -170,6 +178,16 @@ impl<V: Vertex> Face<V> {
     pub fn a(&self) -> &V { &self.a }
     pub fn b(&self) -> &V { &self.b }
     pub fn c(&self) -> &V { &self.c }
+
+    pub fn bca(&self) -> Self { Self::new(self.b.clone(), self.c.clone(), self.a.clone()) }
+    pub fn cab(&self) -> Self { self.bca().bca() }
+}
+
+impl<V: Vertex> Face<V> where V: Div<f64, Output=V> {
+
+    pub fn midpoint(&self) -> V {
+        (self.a.clone() + self.b.clone() + self.c.clone()) / 3.0
+    }
 }
 
 pub type Face3 = Face<Vertex3>;
