@@ -7,6 +7,16 @@ fn is_close(a: f64, b: f64) -> bool {
     absdiff <= atol + rtol * b.abs()
 }
 
+// Determinant. Positive iff c is left of the line from a to b.
+fn orient<V: Vertex>(a: &V, b: &V, c: &V) -> f64 {
+    (a.x() - c.x()) * (b.y() - c.y()) - (a.y() - c.y()) * (b.x() - c.x())
+}
+
+// Negative iff face is ordered counter-clockwise.
+fn orient_face<V: Vertex>(f: &Face<V>) -> f64 {
+    orient(f.a(), f.b(), f.c())
+}
+
 struct LinearBasis<T: Vertex> {
     p: T,
     q: T,
@@ -185,10 +195,66 @@ impl Edge2 {
     }
 }
 
+fn face_order_edge(f1: &Face3, p2: &Vertex3, q2: &Vertex3, r2: &Vertex3) -> FaceOrder {
+    let p1 = f1.a();
+    let q1 = f1.b();
+    let r1 = f1.c();
+    assert!(orient(p2, q2, p1) >= 0.0);
+    assert!(orient(q2, r2, p1) >= 0.0);
+    assert!(orient(r2, p2, p1) < 0.0);
+    panic!("Not implemented")
+}
+
+fn face_order_vertex(f1: &Face3, p2: &Vertex3, q2: &Vertex3, r2: &Vertex3) -> FaceOrder {
+    let p1 = f1.a();
+    let q1 = f1.b();
+    let r1 = f1.c();
+    assert!(orient(p2, q2, p1) >= 0.0);
+    assert!(orient(q2, r2, p1) < 0.0);
+    assert!(orient(r2, p2, p1) < 0.0);
+    panic!("Not implemented")
+}
+
 fn face_order(f1: &Face3, f2: &Face3) -> FaceOrder {
+    assert!(orient_face(f1) < 0.0, "f1 not CCW: {:?}", f1);
+    assert!(orient_face(f2) < 0.0, "f2 not CCW: {:?}", f2);
     if f1.bbox().disjoint_xy(&f2.bbox()) {
         return FaceOrder::Disjoint;
     }
+    let p1 = f1.a();
+    let q1 = f1.b();
+    let r1 = f1.c();
+    let p2 = f2.a();
+    let q2 = f2.b();
+    let r2 = f2.c();
+    if orient(p2, q2, p1) >= 0.0 {
+        if orient(q2, r2, p1) >= 0.0 {
+            if orient(r2, p2, p1) >= 0.0 {
+                panic!("p1 is inside f2")
+            } else {
+                // p1 in R1
+                face_order_edge(f1, p2, q2, r2)
+            }
+        } else {
+            if orient(r2, p2, p1) >= 0.0 {
+                face_order_edge(f1, r2, p2, q2)
+            } else {
+                face_order_vertex(f1, p2, q2, r2)
+            }
+        }
+    } else {
+        if orient(q2, r2, p1) >= 0.0 {
+            if orient(r2, p2, p1) >= 0.0 {
+                face_order_edge(f1, q2, r2, p2)
+            } else {
+                face_order_vertex(f1, q2, r2, p2)
+            }
+        } else {
+            face_order_vertex(f1, r2, p2, q2)
+        }
+    }
+
+    /*
     let b1 = AffineBasis::onto_face(f1);
     let a = f2.a().with_point(b1.project(f2.a()));
     let b = f2.b().with_point(b1.project(f2.b()));
@@ -212,6 +278,7 @@ fn face_order(f1: &Face3, f2: &Face3) -> FaceOrder {
         }
     }
     FaceOrder::Disjoint
+    */
 }
 
 pub fn order_overlapping_triangles<F: FnMut(usize, usize) -> ()>(faces: &[Face3], mut before: F) {
