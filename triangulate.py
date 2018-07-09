@@ -23,6 +23,11 @@ parser.add_argument("--light-circumference-angle", type=float)
 parser.add_argument("--scale-matrix")
 
 
+def compress_values(im):
+    values = np.unique(im)
+    return np.searchsorted(values, im)
+
+
 def main(
     filename,
     output=None,
@@ -38,8 +43,7 @@ def main(
     im = scipy.ndimage.imread(filename)
     if not transpose:
         im = im.T
-    values = np.unique(im)
-    im = np.searchsorted(values, im)
+    im = compress_values(im)
     im = im.astype(np.float32)
     t = Terrain.triangulate_grid(im)
 
