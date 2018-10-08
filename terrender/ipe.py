@@ -17,9 +17,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument('filename')
 
 
-def main():
-    args = parser.parse_args()
-    tree = ElementTree.parse(args.filename)
+def get_points(filename):
+    tree = ElementTree.parse(filename)
     ipe.unmatrix.unmatrix(tree.getroot())
     doc = IpeDoc(tree)
     page, = doc.pages
@@ -48,6 +47,12 @@ def main():
     s = max(sx, sy)
     (ox, oy, oz), = pmin + (pmax - pmin) / 2
     points[..., 1] *= -1
+    return points
+
+
+def main():
+    args = parser.parse_args()
+    points = get_points(args.filename)
     terrain = Terrain.triangulate_xyz(points)
     make_animation(terrain, contour_pos=contour,
                    field_of_view=45.0,
